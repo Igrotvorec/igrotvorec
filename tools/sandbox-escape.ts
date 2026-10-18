@@ -10,6 +10,7 @@ import puppeteer from "puppeteer-core";
 import { assembleGame } from "../packages/runtime/src/index";
 import { addVersion, createGame } from "../apps/server/src/db";
 import type { GameSpec } from "../packages/shared/src/spec";
+import { parseGameMessage } from "../packages/shared/src/protocol";
 
 const BASE = process.argv[2] ?? "http://localhost:8787";
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -54,6 +55,11 @@ const ATTACKS = String.raw`
   parent.postMessage({ gg: 1, runId: run, type: "storage:set", key: "big", value: new Array(5000).join("x") }, "*");
   parent.postMessage({ gg: 1, runId: run, type: "storage:get", reqId: 9, key: "../../other-game:best" }, "*");
   parent.postMessage({ gg: 1, runId: run, type: "navigate", url: "https://example.com/" }, "*");
+  // Забить общую квоту localStorage оболочки множеством разрешённых по размеру значений.
+  for (var i = 0; i < 300; i++) parent.postMessage({ gg: 1, runId: run, type: "storage:set", key: "fill" + i, value: new Array(2000).join("y") }, "*");
+  // Массив с именованными полями: JSON.stringify(array) === "[]" обходил бы проверку размера.
+  var arr = []; arr.gg = 1; arr.runId = run; arr.type = "error"; arr.message = new Array(1000000).join("z");
+  parent.postMessage(arr, "*");
   // Самонавигация iframe на внешний сайт (фишинг внутри нашей страницы) — проверяется снаружи.
   setTimeout(function () { location.href = "https://example.com/phish-inside-frame"; }, 1500);
   kit.onStart(function () {});
@@ -94,9 +100,19 @@ const v = await addVersion({
   genMs: 0,
 });
 
+/** Каждая из этих атак обязана отчитаться; отсутствие результата — провал, а не успех. */
+const EXPECTED_ATTACKS = [...ATTACKS.matchAll(/attempt\("([^"]+)"/g)].map((m) => m[1]!);
+
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
 const outside: string[] = [];
 const attacks: Record<string, string> = {};
+let playStatus = 0;
+let booted = false;
+// Протокол превью (GameFrame) разбирает сообщения через parseGameMessage: массив с именованными
+// полями и гигантские поля должны отклоняться до любой обработки.
+const decorated = Object.assign([], { gg: 1, runId: "r1", type: "error", message: "z".repeat(1_000_000) });
+const hugeParsed = parseGameMessage({ gg: 1, runId: "r1", type: "error", message: "z".repeat(1_000_000) }, "r1");
+const hugeMessageAccepted = parseGameMessage(decorated, "r1") !== null || !hugeParsed || hugeParsed.type !== "error" || hugeParsed.message.length > 1000;
 try {
   const page = await browser.newPage();
   // Все сетевые запросы страницы и фрейма: разрешены только наш origin и data:.
@@ -111,30 +127,55 @@ try {
     const match = t.match(/ATTACK (.+?) => (.*)/);
     if (match) attacks[match[1]!] = match[2]!;
   });
-  await page.exposeFunction("__report", (m: { message?: string }) => {
+  await page.exposeFunction("__report", (m: { type?: string; message?: string }) => {
+    if (m.type === "boot") booted = true;
     const match = m.message?.match(/^ATTACK (.+?) => (.*)$/s);
     if (match) attacks[match[1]!] = match[2]!;
   });
   await page.evaluateOnNewDocument(() => {
     window.addEventListener("message", (e) => {
-      const d = e.data as { gg?: number; type?: string } | null;
-      if (d && d.gg === 1 && d.type === "error") (window as unknown as { __report: (m: unknown) => void }).__report(d);
+      const d = e.data as { gg?: number; type?: string; message?: string } | null;
+      if (d && d.gg === 1 && (d.type === "boot" || d.type === "error")) {
+        (window as unknown as { __report: (m: unknown) => void }).__report({ type: d.type, message: typeof d.message === "string" ? d.message.slice(0, 300) : undefined });
+      }
     });
   });
-  await page.goto(`${BASE}/play/${gameId}`, { waitUntil: "load" });
+  const resp = await page.goto(`${BASE}/play/${gameId}`, { waitUntil: "load" });
+  playStatus = resp?.status() ?? 0;
   await new Promise((r) => setTimeout(r, 4000));
 
   const topUrl = page.url();
   const frameUrls = page.frames().map((f) => f.url());
-  const shellStorage = await page.evaluate(() => Object.keys(localStorage).map((k) => `${k}=${localStorage.getItem(k)?.length}`));
+  const shell = await page.evaluate(() => {
+    const keys = Object.keys(localStorage);
+    return { keys: keys.length, bytes: keys.reduce((n, k) => n + k.length + (localStorage.getItem(k)?.length ?? 0), 0), big: keys.some((k) => k.endsWith(":big")) };
+  });
 
+  const checks: [boolean, string][] = [];
+  checks.push([playStatus === 200, `/play отвечает 200 (получено ${playStatus})`]);
+  checks.push([booted, "игра загрузилась в iframe (пришёл boot)"]);
   console.log("\nАтаки изнутри игры:");
-  for (const [name, res] of Object.entries(attacks).sort()) console.log(`  ${res.startsWith("BLOCKED") ? "✔" : "✘"} ${name.padEnd(24)} ${res.replace(/\s+/g, " ").slice(0, 110)}`);
+  for (const name of EXPECTED_ATTACKS) {
+    const res = attacks[name];
+    const ok = !!res && res.startsWith("BLOCKED");
+    checks.push([ok, name]);
+    console.log(`  ${ok ? "✔" : "✘"} ${name.padEnd(24)} ${res ? res.replace(/\s+/g, " ").slice(0, 110) : "НЕТ РЕЗУЛЬТАТА"}`);
+  }
+  const external = frameUrls.filter((u) => !(u === topUrl || u.startsWith(`${BASE}/g/`) || u === "about:blank" || u.startsWith("chrome-error://")));
+  const outsideChecks: [boolean, string][] = [
+    [topUrl === `${BASE}/play/${gameId}`, `верхняя страница осталась на месте: ${topUrl}`],
+    [external.length === 0, `фрейм не ушёл на чужой сайт${external.length ? ": " + external.join(", ") : ""}`],
+    [outside.length === 0, `ответов из-за пределов нашего origin (beacon, форма, картинки, скрипты): ${outside.length ? outside.join(", ") : "нет"}`],
+    [!shell.big, "значение больше 2 КБ не сохранено"],
+    [shell.keys <= 32 && shell.bytes <= 40_000, `квота хранилища на игру соблюдена: ${shell.keys} ключей, ${shell.bytes} байт после попытки записать 300 × 2 КБ`],
+    [!hugeMessageAccepted, "протокол отклоняет массив-сообщение и обрезает поле на 1 МБ до 1000 символов"],
+  ];
   console.log("\nСнаружи:");
-  console.log(`  ${topUrl === `${BASE}/play/${gameId}` ? "✔" : "✘"} верхняя страница осталась на месте: ${topUrl}`);
-  console.log(`  ${frameUrls.every((u) => u === topUrl || u.startsWith(`${BASE}/g/`) || u === "about:blank" || u.startsWith("chrome-error://")) ? "✔" : "✘"} фрейм не ушёл на чужой сайт: ${frameUrls.join(" | ")}`);
-  console.log(`  ${outside.length === 0 ? "✔" : "✘"} ответы из-за пределов нашего origin (beacon, форма, картинки, скрипты): ${outside.length ? outside.join(", ") : "нет"}`);
-  console.log(`  ✔ хранилище оболочки: ${shellStorage.join(", ") || "пусто"} (значения больше 2048 и чужие ключи не принимаются)`);
+  for (const [ok, label] of outsideChecks) console.log(`  ${ok ? "✔" : "✘"} ${label}`);
+  checks.push(...outsideChecks);
+  const failed = checks.filter(([ok]) => !ok);
+  console.log(`\nИтог: ${checks.length - failed.length}/${checks.length} проверок пройдено`);
+  if (failed.length) process.exitCode = 1;
 } finally {
   await browser.close();
 }

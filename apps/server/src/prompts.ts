@@ -67,7 +67,7 @@ Feedback:
 - kit.vibrate(ms), kit.particles(x, y, color, count)  (particles are drawn and animated by the runtime)
 Sprites (AI-generated illustrations, already embedded):
 - kit.sprite(key, x, y, w, h?, { rotate?, flipX?, alpha? })  draws the sprite fitted into the box (x, y = top-left). If the image is missing it draws the fallback emoji, so always call it the same way.
-- Use the sprites listed in the spec for their objects instead of drawing those objects with primitives. Size them generously (at least 40 * kit.uiScale px).
+- Use the sprites listed in the spec for their objects instead of drawing those objects with primitives. Draw each sprite at the object's gameplay size (its hitbox or grid cell, at most ~15% larger) so visuals match collisions; in grid games a sprite fills one cell.
 Drawing helpers (use ctx directly for anything else):
 - kit.text(str, x, y, { size=20, color, align="center", weight="700", baseline="middle" })
 - kit.roundRect(x, y, w, h, r, fill?, stroke?), kit.circle(x, y, r, fill?, stroke?)
@@ -83,7 +83,7 @@ Hard rules:
 - Do not implement pause, start, restart or result screens and do not draw a pause button: the runtime already provides them.
 - Movement must be time-based (multiply by dt) and scaled by kit.speed.
 - Everything important stays within 0..360 x 0..640. The runtime shows kit.score at the top center (top 56px). If you draw your own score/progress panel, call kit.showHud(false) once at the top level so the score is not shown twice.
-- Interactive targets are at least 48 * kit.uiScale logical px. Text at least 16 * kit.uiScale px.
+- Interactive targets are at least 48 * kit.uiScale logical px. Text is at least the audience minimum font given below (never smaller than 16 px).
 - Show remaining time/lives/goal on screen while playing so the player understands progress.
 - The round must end: implement both the win condition and the lose condition exactly as the spec says. Include a timer if the spec mentions one.
 - Give juicy feedback: kit.sfx + kit.particles on scoring, a short shake/flash on mistakes.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { parseGameMessage } from "@gg/shared";
+import { STORAGE_MAX_BYTES, STORAGE_MAX_KEYS, parseGameMessage } from "@gg/shared";
 
 /** Каждый статус помнит свою версию, поэтому устаревший статус не применится к другой. */
 export type FrameStatus = { versionId: string } & (
@@ -10,6 +10,20 @@ export type FrameStatus = { versionId: string } & (
 );
 
 const storeKey = (gameId: string, key: string) => `gg:/play/${gameId}:${key}`;
+
+/** Та же квота на игру, что и в /play: одна игра не может забить общий localStorage. */
+function fitsQuota(gameId: string, fullKey: string, value: string) {
+  const prefix = storeKey(gameId, "");
+  let keys = 0;
+  let bytes = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(prefix) || k === fullKey) continue;
+    keys++;
+    bytes += k.length + (localStorage.getItem(k) ?? "").length;
+  }
+  return keys + 1 <= STORAGE_MAX_KEYS && bytes + fullKey.length + value.length <= STORAGE_MAX_BYTES;
+}
 
 /**
  * Игра в sandbox-iframe; компонент работает доверенной оболочкой: отвечает на запросы хранилища
@@ -61,7 +75,8 @@ export function GameFrame({
         win.postMessage({ gg: 1, type: "storage:value", reqId: m.reqId, value }, "*");
       } else if (m.type === "storage:set") {
         try {
-          localStorage.setItem(storeKey(gameId, m.key), m.value);
+          const full = storeKey(gameId, m.key);
+          if (fitsQuota(gameId, full, m.value)) localStorage.setItem(full, m.value);
         } catch {
           /* хранилище недоступно */
         }

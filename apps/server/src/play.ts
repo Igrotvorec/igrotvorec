@@ -24,6 +24,20 @@ export function playShell(opts: { title: string; versionId: string; background: 
   var frame = document.getElementById("game");
   var storeKey = function (k) { return "gg:" + location.pathname + ":" + k; };
   var errorSent = false;
+  // Квота на игру: общий localStorage origin не должен забиваться одной игрой.
+  var MAX_KEYS = 32, MAX_BYTES = 32768;
+  function fitsQuota(fullKey, value) {
+    var prefix = storeKey(""), keys = 0, bytes = 0;
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf(prefix) !== 0 || k === fullKey) continue;
+        keys++;
+        bytes += k.length + (localStorage.getItem(k) || "").length;
+      }
+    } catch (err) { return false; }
+    return keys + 1 <= MAX_KEYS && bytes + fullKey.length + value.length <= MAX_BYTES;
+  }
   function send(type, extra) {
     var body = JSON.stringify(Object.assign({ versionId: cfg.versionId, session: session, type: type }, extra || {}));
     try { navigator.sendBeacon ? navigator.sendBeacon("/api/events", new Blob([body], { type: "application/json" })) : fetch("/api/events", { method: "POST", body: body, headers: { "content-type": "application/json" }, keepalive: true }); } catch (e) {}
@@ -31,13 +45,13 @@ export function playShell(opts: { title: string; versionId: string; background: 
   window.addEventListener("message", function (e) {
     if (e.source !== frame.contentWindow) return;
     var m = e.data;
-    if (!m || m.gg !== 1 || m.runId !== runId || typeof m.type !== "string") return;
+    if (!m || typeof m !== "object" || Array.isArray(m) || m.gg !== 1 || m.runId !== runId || typeof m.type !== "string") return;
     if (m.type === "storage:get" && typeof m.key === "string" && m.key.length < 64) {
       var v = null;
       try { v = localStorage.getItem(storeKey(m.key)); } catch (err) {}
       frame.contentWindow.postMessage({ gg: 1, type: "storage:value", reqId: m.reqId, value: v }, "*");
     } else if (m.type === "storage:set" && typeof m.key === "string" && m.key.length < 64 && typeof m.value === "string" && m.value.length <= 2048) {
-      try { localStorage.setItem(storeKey(m.key), m.value); } catch (err) {}
+      if (fitsQuota(storeKey(m.key), m.value)) try { localStorage.setItem(storeKey(m.key), m.value); } catch (err) {}
     } else if (m.type === "state") {
       if (m.state === "playing") send("round_start");
       // Время раунда без пауз считает рантайм; ограничиваем, чтобы событие не отбросила схема сервера.

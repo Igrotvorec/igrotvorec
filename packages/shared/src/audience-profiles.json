@@ -1,0 +1,194 @@
+{
+  "seniors": {
+    "id": "seniors",
+    "label": "Пожилые",
+    "uiScale": 1.83,
+    "minTapTargetPx": 88,
+    "minFontPx": 25,
+    "speedMultiplier": 0.6,
+    "roundSeconds": [60, 180],
+    "paletteHint": "text contrast at least 7:1 (WCAG AAA), dark text on a light background, calm muted colors, state shown by shape/icon as well as color, no flashing",
+    "preferredGenres": ["puzzle", "quiz", "match3", "other"],
+    "avoid": [
+      "tap targets smaller than 88 logical px (14 mm, Leitão & Silva 2012)",
+      "swipe-only controls; if a swipe is needed, make its target at least 117 logical px (17.5 mm) and offer a tap alternative",
+      "pinch, spread and other multi-finger gestures",
+      "long press as an action (older users press slowly, so taps get read as holds or drags)",
+      "requiring successive taps faster than about 1 s apart",
+      "fixed time pressure that cannot be relaxed",
+      "modes where the same gesture does different things",
+      "text smaller than 25 logical px",
+      "thin font weights",
+      "flashing more than 3 times per second",
+      "forcing an ad or a wait before the player can continue"
+    ],
+    "notes": [
+      "Main buttons: 88+ logical px. Dense boards (match-3, grids) may go down to 72 px cells with at most 5 columns and visible gaps; Kobayashi 2011 measured 5.6% errors at about 11 mm",
+      "Prefer drags to the right or down over drags to the left or up (Gao & Sun 2015)",
+      "Give sound or vibration feedback on every tap; combined sound and vibration worked best (Hwangbo 2013)",
+      "One short instruction on the start screen with a visual hint; older users needed cues to discover gestures (Kobayashi 2011)",
+      "Forgiving play: extra lives or no instant fail, gentle difficulty ramp; ease of play is the top-valued feature for 49% of gamers 50+ (AARP 2023)",
+      "Card/solitaire and word games map to genre 'other'; they rank among the top genres for 50+ (AARP 2023, Yandex 2022)"
+    ],
+    "sources": [
+      { "title": "Leitão & Silva 2012, Target and spacing sizes for smartphone UIs for older adults: n=40, aged 65–95; tap targets >14 mm and swipe targets 17.5 mm reach >97% accuracy; spacing had no significant effect", "url": "https://mural.maynoothuniversity.ie/id/eprint/6045/1/PS-Target-Spacing.pdf", "kind": "observation" },
+      { "title": "Kobayashi et al. 2011, Elderly user evaluation of mobile touchscreen interactions: n=20, in their 60s–70s; error rate on a small device 39% / 6.5% / 5.6% at about 4.7 / 7.8 / 10.9 mm; tap about 1.0 s, drag 2.2 s, pinch 2.8 s; recommends targets of 8 mm or more", "url": "https://dl.ifip.org/db/conf/interact/interact2011-1/KobayashiHMAHI11.pdf", "kind": "observation" },
+      { "title": "Gao & Sun 2015, Human Factors 57(5): buttons larger than 15.9×9.0 mm performed better for older adults; rightward and downward drags preferred; older adults preferred click-based designs", "url": "https://pubmed.ncbi.nlm.nih.gov/25957042/", "kind": "observation" },
+      { "title": "Hwangbo et al. 2013, Pointing performance of elderly users on smartphones: target size, spacing and screen location all matter; combined sound and vibration feedback was best", "url": "https://pure.seoultech.ac.kr/en/publications/a-study-of-pointing-performance-of-elderly-users-on-smartphones/", "kind": "observation" },
+      { "title": "Apple HIG, Typography: iOS Dynamic Type Body at xxxLarge = 23 pt, AX1 = 28 pt; thin weights need larger sizes", "url": "https://developer.apple.com/design/human-interface-guidelines/typography", "kind": "guideline" },
+      { "title": "Yeh 2020, Heliyon 6(6): n=32, aged 65–76, on a tablet; reading time 9.6 s at 10 pt vs 2.2 s at 22 pt", "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7330495/", "kind": "observation" },
+      { "title": "NN/g 2013, Usability for Senior Citizens: seniors 43% slower and task success 55.3% vs 74.5%; dexterity score 73% vs 95%", "url": "https://www.nngroup.com/articles/usability-seniors-improvements/", "kind": "observation" },
+      { "title": "WCAG 2.2 SC 1.4.3/1.4.6 Understanding: 4.5:1 is based on 20/40 acuity, typical at about age 80; 7:1 (AAA) is for 20/80", "url": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html", "kind": "guideline" },
+      { "title": "Nap, de Kort & IJsselsteijn 2009, Senior gamers: in-game speed was the prominent difficulty; they ask for adjustable time; 8 of 10 played card games", "url": "https://journal.gerontechnology.org/archives/1054-1055-1-PB.pdf", "kind": "observation" },
+      { "title": "Der & Deary 2006, Psychol Aging 21(1): n=7,130; choice reaction time slows throughout adulthood, simple reaction time after about 50", "url": "https://pubmed.ncbi.nlm.nih.gov/16594792/", "kind": "observation" },
+      { "title": "Apple HIG, Accessibility: offer difficulty accommodations, e.g. adjustable reaction time; avoid multifinger gestures; offer onscreen alternatives to swipes", "url": "https://developer.apple.com/design/human-interface-guidelines/accessibility", "kind": "guideline" },
+      { "title": "AARP 2023, The 50-Plus Gamer: n=2,657 monthly gamers 50+; puzzle/logic 73%, card/tile 69%; 84% play on a smartphone; ease of play is the top feature (49%); 59% are frustrated by ads required to continue", "url": "https://app2top.com/wp-content/uploads/2023/04/2023-gamers-50-plus.doi10.26419-2Fres.00585.001.pdf", "kind": "observation" },
+      { "title": "ESA Essential Facts 2025: 73% of players aged 61–90 prefer puzzle games", "url": "https://www.theesa.com/annual-esa-study-reveals-video-games-universal-appeal-across-generations/", "kind": "observation" },
+      { "title": "Яндекс, 2022: в браузерных играх 55+ предпочитают пасьянсы («Паук», «Косынка»), 45–54 — нарды и дурака", "url": "https://yandex.ru/blog/gamesfordevelopers/kakie-brauzernye-igry-predpochitayut-zhiteli-rossii", "kind": "observation" },
+      { "title": "MyTracker 2020: игроки 65+ охотнее всего платят в кроссвордах, судоку, викторинах и три-в-ряд", "url": "https://tracker.my.com/blog/profil-mobilnogo-gejmera-issledovanie-mytracker?lang=ru", "kind": "observation" },
+      { "title": "Сбер «Ловлю на слове»: ~350 тыс. участников, среднее время в игре 53 мин (данные банка; методика не раскрыта)", "url": "https://habr.com/ru/articles/1018528/", "kind": "observation" },
+      { "title": "speedMultiplier 0.6, roundSeconds [60,180], the 72 px board-cell floor and uiScale 1.83 (= 88/48) have no direct source; they are derived from the studies above", "kind": "heuristic" }
+    ]
+  },
+  "kids": {
+    "id": "kids",
+    "label": "Дети",
+    "uiScale": 1.67,
+    "minTapTargetPx": 80,
+    "minFontPx": 22,
+    "speedMultiplier": 0.8,
+    "roundSeconds": [30, 90],
+    "paletteHint": "bright friendly colors, rounded shapes, characters that react when tapped; keep text-to-background contrast at least 4.5:1; no flashing",
+    "preferredGenres": ["clicker", "runner", "arcade", "match3"],
+    "avoid": [
+      "tap targets smaller than 80 logical px; for ages 3–5 use 134 px (2 cm, NN/g)",
+      "double tap, long press, two-handed or multi-finger gestures",
+      "precise drag-to-target placement",
+      "fast reactions for the youngest players (NN/g: under 5)",
+      "reading-heavy rules; younger children don't read",
+      "anything that looks like an ad or a tiny close button",
+      "violence (Yandex Games 3.4.3, 8.3.6: content must suit all ages)",
+      "flashing more than 3 times per second; photosensitive epilepsy most often starts at ages 7–19",
+      "losing too fast"
+    ],
+    "notes": [
+      "Ignore a repeat tap that lands near the previous target within a short window; in Anthony 2012, 96% of these 'holdover' taps came from children (the 250 ms window is a heuristic)",
+      "Offer several ways to do the main action: drag, a tap on an arrow, or a tap on a screen half (NN/g)",
+      "Instant feedback on every tap: sound, animation, character reaction (NN/g)",
+      "Icons and pictures instead of text; any text uses short words",
+      "Keep everything on one screen with no scrolling; younger children avoid scrolling (NN/g)"
+    ],
+    "sources": [
+      { "title": "NN/g 2018, Design for Kids Based on Their Physical Development: touch targets at least 2×2 cm for young children (vs 1×1 cm for adults); under 9 use tap/swipe/drag; under 5 avoid fast reactions and two-handed input; adult-level input at about 11", "url": "https://www.nngroup.com/articles/children-ux-physical-development/", "kind": "guideline" },
+      { "title": "NN/g 2019, Children's UX (n=125, aged 3–12): fonts 14 pt for younger and 12 pt for older children (adults 12 pt); children want immediate feedback; ads are hard to tell from content; younger children avoid scrolling", "url": "https://www.nngroup.com/articles/childrens-websites-usability-issues/", "kind": "guideline" },
+      { "title": "Anthony et al. 2012, ITS (children 7–16 vs adults): first-try miss rate 23.1% vs 16.9%; 3.2 mm targets too small; ≥6.35 mm needed about one attempt; 96% of holdover taps came from children", "url": "https://lisa-anthony.com/wp-content/uploads/2012/09/anthony-et-al-tabletop20121.pdf", "kind": "observation" },
+      { "title": "Hiniker et al. 2015, Touchscreen Prompts for Preschoolers (n=34, aged 2–5): in-app prompts didn't work for children under 3; cites 73% success at age 3 and 89% over 5 (Vatavu 2015)", "url": "https://faculty.washington.edu/alexisr/TouchscreenPrompts.pdf", "kind": "observation" },
+      { "title": "Material Design: 48×48 dp ≈ 9 mm, 8 dp spacing; larger targets for children whose motor coordination is still developing", "url": "https://m1.material.io/usability/accessibility.html", "kind": "guideline" },
+      { "title": "Google Play Families, Ads and Monetization: no ads that look like content; interrupting ads closable after 5 s; no evasive close buttons", "url": "https://support.google.com/googleplay/android-developer/answer/9893335?hl=en", "kind": "guideline" },
+      { "title": "Apple Kids Category: age bands 5 and under, 6–8, 9–11; parental gate for purchases and external links", "url": "https://developer.apple.com/app-store/kids-apps/", "kind": "guideline" },
+      { "title": "Epilepsy Society 2025: photosensitive epilepsy is most often first seen at ages 7–19", "url": "https://epilepsysociety.org.uk/sites/default/files/2025-04/PhotosensitiveepilepsyApril2025.pdf", "kind": "observation" },
+      { "title": "Альфа «Рыбки в банке» — раннер «для детей» (без цифр)", "url": "https://habr.com/ru/articles/1018528/", "kind": "observation" },
+      { "title": "80 px (≈12–12.7 mm) is an interpolation for ages 6–12 between the adult 9 mm (Material) and the preschool 20 mm (NN/g) and matches the largest size in Anthony 2012; speedMultiplier, roundSeconds and the palette are not sourced; no primary source on kids' attention span was found", "kind": "heuristic" }
+    ]
+  },
+  "teens": {
+    "id": "teens",
+    "label": "Подростки",
+    "uiScale": 1.0,
+    "minTapTargetPx": 48,
+    "minFontPx": 18,
+    "speedMultiplier": 1.2,
+    "roundSeconds": [30, 90],
+    "paletteHint": "modern, confident, not childish; bold accents on a dark or neutral base, but no garish 'loud' color mixes and no heavy decorative animation",
+    "preferredGenres": ["arcade", "runner", "clicker", "quiz"],
+    "avoid": [
+      "childish visuals and patronizing copy (NN/g teens)",
+      "small fonts; teens complained about them (NN/g)",
+      "slow start, pop-ups, long tutorials",
+      "heavy decorative animation",
+      "flashing more than 3 times per second (photosensitive epilepsy onset peaks at ages 7–19)"
+    ],
+    "notes": [
+      "Score chase: best score on screen and a short result card to show friends; 72% of teen players play to spend time with others (Pew 2024)",
+      "Ramp difficulty quickly; reaction speed is near its lifetime peak (in-game latency starts rising around age 24, Thompson 2014)",
+      "Text at about 6th-grade reading level, a few words per screen (NN/g)"
+    ],
+    "sources": [
+      { "title": "NN/g 2019, Teenagers on the Web (n=100, aged 13–17): dislike childish design, heavy animation, loud colors and patronizing copy; complain about small fonts; low patience; reading level about 6th grade", "url": "https://www.nngroup.com/articles/usability-of-websites-for-teenagers/", "kind": "guideline" },
+      { "title": "Pew Research 2024, Teens and Video Games Today (n=1,453): 85% play, 41% daily; 70% play on a smartphone; 72% play to spend time with others", "url": "https://www.pewresearch.org/internet/2024/05/09/teens-and-video-games-today/", "kind": "observation" },
+      { "title": "Thompson, Blair & Henrey 2014, Over the Hill at 24, PLOS ONE (n=3,305, aged 16–44): in-game looking-doing latency starts to rise at about age 24", "url": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0094215", "kind": "observation" },
+      { "title": "НАФИ/ВШЭ 2025 (n=4,600, 14+): в видеоигры играют 93% в 14–17 и 90% в 18–24", "url": "https://creative.hse.ru/news/6359", "kind": "observation" },
+      { "title": "Яндекс 2022: аудитория до 24 лет ищет игры на двоих, симуляторы и .io", "url": "https://yandex.ru/blog/gamesfordevelopers/kakie-brauzernye-igry-predpochitayut-zhiteli-rossii", "kind": "observation" },
+      { "title": "Apple HIG: default control size 44×44 pt; 48 logical px is at least 45 pt even in the smallest WebView viewport", "url": "https://developer.apple.com/design/human-interface-guidelines/accessibility", "kind": "guideline" },
+      { "title": "Material 3 bodyLarge 16 sp → 18 logical px", "url": "https://developer.android.com/develop/ui/compose/designsystems/material3", "kind": "guideline" },
+      { "title": "speedMultiplier 1.2 and roundSeconds [30,90] only follow the direction of Thompson 2014; the exact values are not sourced", "kind": "heuristic" }
+    ]
+  },
+  "adults": {
+    "id": "adults",
+    "label": "Взрослые",
+    "uiScale": 1.08,
+    "minTapTargetPx": 52,
+    "minFontPx": 18,
+    "speedMultiplier": 1.0,
+    "roundSeconds": [45, 120],
+    "paletteHint": "clean modern palette, text contrast at least 4.5:1 (WCAG AA)",
+    "preferredGenres": ["match3", "puzzle", "quiz", "arcade"],
+    "avoid": [
+      "long tutorials",
+      "rounds that cannot be finished in a short break",
+      "two-handed controls"
+    ],
+    "notes": [
+      "Playable one-handed during a short break; 40% of mobile play in the T2 data happens during the working day",
+      "Best-score persistence and a reason to replay (Yandex Games 2.9)",
+      "Puzzle and match-3 audiences skew toward women aged 35+; keep visuals neutral and friendly rather than 'gamer'"
+    ],
+    "sources": [
+      { "title": "Android accessibility: touch targets at least 48×48 dp → 52 logical px", "url": "https://developer.android.com/guide/topics/ui/accessibility/apps", "kind": "guideline" },
+      { "title": "Material 3 type scale: bodyLarge 16 sp → 18 logical px (iOS default body 17 pt → 19)", "url": "https://developer.android.com/develop/ui/compose/designsystems/material3", "kind": "guideline" },
+      { "title": "T2, Q1 2025 (35 games, 5.9M monthly players): 35–44 = 41%, 45–54 = 21%; women 56.5%; match-3 is the #2 genre (58% women); 40% of play during the working day", "url": "https://www.mobilecomm.ru/kto-i-kogda-igraet-v-igry-na-smartfonah", "kind": "observation" },
+      { "title": "НАФИ/ВШЭ 2025: 54% мобильных игроков предпочитают головоломки; женщины 41% vs мужчины 18%", "url": "https://creative.hse.ru/news/6359", "kind": "observation" },
+      { "title": "Newzoo 2019, Betting on Billions (n=6,150): most puzzle players (e.g. Candy Crush) are 36–50 and two-thirds are women", "url": "https://strivesponsorship.com/wp-content/uploads/2019/04/Newzoo-Betting-on-Billions-Unlocking-the-Power-of-Mobile-Gamers-March-2019.pdf", "kind": "observation" },
+      { "title": "Facebook Gaming/GameRefinery 2020 (>13k players): matching puzzle about 75% women; puzzle 60% over 35; over 7 in 10 prefer shorter sessions", "url": "https://www.prnewswire.com/news-releases/facebook-and-gamerefinery-launch-mobile-gaming-report-genre-and-great-games---understanding-audiences-and-designing-better-mobile-games-301109897.html", "kind": "observation" },
+      { "title": "Mediascope: казуальные игры — 35% игровой активности в мобайле", "url": "https://mediascope.net/news/1462457/", "kind": "observation" },
+      { "title": "Т-Банк «Ряд наград» (три-в-ряд): 3 млн участников, 36 млн партий (≈12 партий на игрока)", "url": "https://habr.com/ru/articles/1018528/", "kind": "observation" },
+      { "title": "Adjust 2020: hyper-casual 2m39s per user per day vs 19m52s for other games", "url": "https://rgda.ro/wp-content/uploads/2020/07/Adjust_Hyper_Casual_Gaming_Report_2020.pdf", "kind": "observation" },
+      { "title": "Билайн: в каталоге игр фильтры «Аркада», «Ферма», «Три-в-ряд»; есть викторины и пасьянс", "url": "https://bor.beeline.ru/games/games-page/", "kind": "observation" },
+      { "title": "roundSeconds [45,120] has no direct source (no verified per-round data was found); it fits several rounds into a session of a few minutes", "kind": "heuristic" }
+    ]
+  },
+  "general": {
+    "id": "general",
+    "label": "Все",
+    "uiScale": 1.25,
+    "minTapTargetPx": 60,
+    "minFontPx": 19,
+    "speedMultiplier": 0.9,
+    "roundSeconds": [30, 120],
+    "paletteHint": "friendly, readable, medium saturation; text contrast at least 4.5:1; never rely on color alone",
+    "preferredGenres": ["puzzle", "match3", "arcade", "quiz"],
+    "avoid": [
+      "complex or multi-finger controls",
+      "controls that need scrolling or swiping to reach on the main screen (Yandex Games 1.10.4)",
+      "long press opening a selection or context menu (Yandex Games 1.6.1.8)",
+      "flashing more than 3 times per second (WCAG 2.3.1)"
+    ],
+    "notes": [
+      "Understandable within 5 seconds without reading; controls are explained in-game (Yandex Games 2.2)",
+      "One-handed play (Yandex Games 1.10.4)",
+      "Sound stops when the game loses focus (Yandex Games 1.3); mute and pause buttons are recommended (6.2, 6.3)",
+      "Audience is mixed: 20% of the Yandex Games audience is 55+, so sizes sit between the adults and seniors profiles"
+    ],
+    "sources": [
+      { "title": "Яндекс Игры, требования: 1.8 удобный размер интерактивных элементов (без числовой нормы); 1.10.4 управление одной рукой без прокрутки; 1.6.1.8; 1.3; 2.2; рекомендации 6.2, 6.3, 6.8", "url": "https://yandex.ru/dev/games/doc/ru/concepts/requirements.html", "kind": "guideline" },
+      { "title": "Яндекс Игры, аудитория: 0–24 = 11%, 25–34 = 13%, 35–44 = 49%, 45–54 = 7%, 55+ = 20%; 50% на телефонах (страница без даты)", "url": "https://yandex.ru/dev/games/doc/ru/", "kind": "observation" },
+      { "title": "Material Design: 48 dp ≈ 9 mm, recommended range 7–10 mm, 8 dp spacing → 9 mm = 60 logical px", "url": "https://m1.material.io/usability/accessibility.html", "kind": "guideline" },
+      { "title": "WCAG 2.2 SC 2.5.5 (AAA) target size at least 44×44 CSS px; SC 2.5.8 (AA) at least 24×24", "url": "https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html", "kind": "guideline" },
+      { "title": "WCAG 2.2 SC 2.3.1: no more than 3 flashes in any 1 s period", "url": "https://www.w3.org/WAI/WCAG22/Understanding/three-flashes-or-below-threshold.html", "kind": "guideline" },
+      { "title": "Apple HIG: iOS default body text 17 pt → 19 logical px; don't rely on color alone", "url": "https://developer.apple.com/design/human-interface-guidelines/accessibility", "kind": "guideline" },
+      { "title": "НАФИ/ВШЭ 2025: головоломки предпочитают 54% мобильных игроков — самый широкий жанр", "url": "https://creative.hse.ru/news/6359", "kind": "observation" },
+      { "title": "speedMultiplier 0.9 and roundSeconds [30,120] are a compromise for a mixed audience and are not sourced", "kind": "heuristic" }
+    ]
+  }
+}

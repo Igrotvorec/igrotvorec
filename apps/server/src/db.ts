@@ -43,9 +43,10 @@ if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some(
 // Миграция: тип версии хранится отдельно, а не префиксом текста пользователя.
 if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some((c) => c.name === "kind")) {
   db.exec("ALTER TABLE versions ADD COLUMN kind TEXT NOT NULL DEFAULT 'edit'");
-  db.exec("UPDATE versions SET kind = 'repair' WHERE instruction LIKE 'auto-fix: %'");
-  db.exec("UPDATE versions SET kind = 'create' WHERE version = 1 AND kind = 'edit'");
+  db.exec("UPDATE versions SET kind = 'repair' WHERE version > 1 AND instruction LIKE 'auto-fix: %'");
 }
+// Версия 1 — всегда создание игры, даже если старая миграция приняла её за исправление по тексту.
+db.exec("UPDATE versions SET kind = 'create' WHERE version = 1 AND kind != 'create'");
 
 const shortId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 10);
 
