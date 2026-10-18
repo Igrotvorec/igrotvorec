@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { GameDetail, GameSpec, GameSummary, GameVersion } from "@gg/shared";
+import type { GameDetail, GameSpec, GameSummary, GameVersion, VersionKind } from "@gg/shared";
 import { config } from "./config";
 
 mkdirSync(join(config.dataDir, "games"), { recursive: true });
@@ -37,6 +37,12 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_version ON events(version_id);
 `);
+// Миграция: тип версии хранится отдельно, а не префиксом текста пользователя.
+if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some((c) => c.name === "kind")) {
+  db.exec("ALTER TABLE versions ADD COLUMN kind TEXT NOT NULL DEFAULT 'edit'");
+  db.exec("UPDATE versions SET kind = 'repair' WHERE instruction LIKE 'auto-fix: %'");
+  db.exec("UPDATE versions SET kind = 'create' WHERE version = 1 AND kind = 'edit'");
+}
 
 const shortId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 10);
 
@@ -49,6 +55,7 @@ interface VersionRow {
   spec: string;
   code: string;
   instruction: string;
+  kind: VersionKind;
   created_at: number;
 }
 
@@ -56,6 +63,7 @@ const toVersion = (r: VersionRow): GameVersion => ({
   id: r.id,
   gameId: r.game_id,
   version: r.version,
+  kind: r.kind,
   spec: JSON.parse(r.spec) as GameSpec,
   instruction: r.instruction,
   createdAt: r.created_at,
@@ -67,9 +75,17 @@ export function createGame(prompt: string): string {
   return id;
 }
 
-/** Сначала пишет HTML на диск, потом строку версии: ссылка появляется, только когда готово и то и другое. */
+export class ConflictError extends Error {}
+
+/**
+ * Сначала пишет HTML на диск, потом строку версии: ссылка появляется, только когда готово и то и другое.
+ * baseVersionId — версия, от которой строилась новая (null для новой игры). Если за время генерации
+ * появилась более новая версия, публикация отклоняется, чтобы не затереть чужую правку.
+ */
 export async function addVersion(v: {
   gameId: string;
+  baseVersionId: string | null;
+  kind: VersionKind;
   spec: GameSpec;
   code: string;
   html: string;
@@ -78,16 +94,23 @@ export async function addVersion(v: {
   genMs: number;
 }): Promise<{ id: string; version: number }> {
   const id = shortId();
-  await Bun.write(gamePath(id), v.html);
+  const path = gamePath(id);
+  await Bun.write(path, v.html);
   const insert = db.transaction(() => {
-    const row = db.query("SELECT COALESCE(MAX(version), 0) AS n FROM versions WHERE game_id = ?").get(v.gameId) as { n: number };
-    const version = row.n + 1;
+    const latest = db.query("SELECT id, version FROM versions WHERE game_id = ? ORDER BY version DESC LIMIT 1").get(v.gameId) as { id: string; version: number } | null;
+    if ((latest?.id ?? null) !== v.baseVersionId) throw new ConflictError("Игра успела измениться, пока шла генерация. Повторите запрос.");
+    const version = (latest?.version ?? 0) + 1;
     db.query(
-      "INSERT INTO versions (id, game_id, version, spec, code, instruction, model, gen_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).run(id, v.gameId, version, JSON.stringify(v.spec), v.code, v.instruction, v.model, v.genMs, Date.now());
+      "INSERT INTO versions (id, game_id, version, kind, spec, code, instruction, model, gen_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(id, v.gameId, version, v.kind, JSON.stringify(v.spec), v.code, v.instruction, v.model, v.genMs, Date.now());
     return version;
   });
-  return { id, version: insert() };
+  try {
+    return { id, version: insert() };
+  } catch (e) {
+    await Bun.file(path).delete().catch(() => {});
+    throw e;
+  }
 }
 
 export function getVersion(id: string): (GameVersion & { code: string }) | null {

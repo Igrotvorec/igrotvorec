@@ -1,9 +1,12 @@
 import type { GameSpec } from "./spec";
 
+export type VersionKind = "create" | "edit" | "repair";
+
 export interface GameVersion {
   id: string;
   gameId: string;
   version: number;
+  kind: VersionKind;
   spec: GameSpec;
   instruction: string;
   createdAt: number;

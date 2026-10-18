@@ -6,7 +6,8 @@ export type Audience = (typeof AUDIENCES)[number];
 export const GENRES = ["arcade", "match3", "runner", "quiz", "clicker", "puzzle", "other"] as const;
 export type Genre = (typeof GENRES)[number];
 
-const HexColor = z.string().regex(/^#[0-9a-fA-F]{3,8}$/);
+export const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const HexColor = z.string().regex(HEX_COLOR);
 
 export const GameSpecSchema = z.object({
   title: z.string().min(1).max(40),
@@ -33,8 +34,8 @@ export const GameSpecSchema = z.object({
 });
 export type GameSpec = z.infer<typeof GameSpecSchema>;
 
-/** JSON-схема для structured output LLM. Синхронизируется с GameSpecSchema вручную. */
-export const gameSpecJsonSchema = {
+/** JSON-схема spec для structured output LLM. Синхронизируется с GameSpecSchema вручную. */
+const gameSpecJsonSchema = {
   type: "object",
   additionalProperties: false,
   required: [
@@ -66,5 +67,20 @@ export const gameSpecJsonSchema = {
     difficulty: { type: "string", enum: ["very_easy", "easy", "normal", "hard"] },
     roundSeconds: { type: "integer" },
     language: { type: "string" },
+  },
+} as const;
+
+/**
+ * Ответ spec-этапа: решение о допустимости запроса плюс сама spec.
+ * При allowed=false spec заполняется формально и не используется.
+ */
+export const specResponseJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["allowed", "refusalReason", "spec"],
+  properties: {
+    allowed: { type: "boolean" },
+    refusalReason: { type: "string" },
+    spec: gameSpecJsonSchema,
   },
 } as const;

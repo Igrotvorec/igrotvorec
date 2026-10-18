@@ -8,8 +8,6 @@ import { Progress } from "./Progress";
 import { useOperation } from "./useOperation";
 import { navigate } from "./router";
 
-const REPAIR_PREFIX = "auto-fix: ";
-
 export function GameView({ id }: { id: string }) {
   const [game, setGame] = useState<GameDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -50,7 +48,7 @@ export function GameView({ id }: { id: string }) {
   // Одно автоисправление ошибки выполнения в последней версии (но не в самом исправлении).
   useEffect(() => {
     if (!status || status.kind !== "error" || !version || status.versionId !== version.id || !isLatest || op.running) return;
-    if (version.instruction.startsWith(REPAIR_PREFIX) || repairedRef.current.has(version.id)) return;
+    if (version.kind === "repair" || repairedRef.current.has(version.id)) return;
     repairedRef.current.add(version.id);
     setOpKind("repair");
     run("/api/repair", { versionId: version.id, error: status.message });
@@ -129,7 +127,7 @@ export function GameView({ id }: { id: string }) {
                 >
                   <span className="v-num">v{v.version}</span>
                   <span className="v-text">
-                    {v.instruction.startsWith(REPAIR_PREFIX) ? "Автоисправление ошибки" : v.instruction}
+                    {v.kind === "repair" ? "Автоисправление ошибки" : v.instruction}
                   </span>
                 </button>
               </li>
