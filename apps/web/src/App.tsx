@@ -1,5 +1,6 @@
 import { GameView } from "./GameView";
 import { Home } from "./Home";
+import { Stats } from "./Stats";
 import { navigate, usePath } from "./router";
 
 export function App() {
@@ -19,8 +20,20 @@ export function App() {
           <span className="logo-mark" />
           Игротворец
         </a>
+        <nav>
+          <a
+            href="/stats"
+            className={path === "/stats" ? "active" : ""}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate("/stats");
+            }}
+          >
+            Статистика
+          </a>
+        </nav>
       </header>
-      {gameMatch ? <GameView id={gameMatch[1]!} /> : <Home />}
+      {gameMatch ? <GameView id={gameMatch[1]!} /> : path === "/stats" ? <Stats /> : <Home />}
     </>
   );
 }

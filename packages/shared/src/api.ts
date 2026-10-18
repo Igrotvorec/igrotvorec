@@ -33,3 +33,18 @@ export type GenEvent =
   | { type: "done"; gameId: string; versionId: string; version: number }
   | { type: "error"; message: string }
   | { type: "ping" };
+
+/** Агрегат телеметрии /play по сегменту «аудитория × жанр». */
+export interface SegmentStatsDto {
+  audience: GameSpec["audience"];
+  genre: GameSpec["genre"];
+  games: number;
+  sessions: number;
+  rounds: number;
+  finished: number;
+  wins: number;
+  /** Сессии, в которых начато больше одного раунда. */
+  replaySessions: number;
+  avgRoundSec: number | null;
+  errorSessions: number;
+}

@@ -65,8 +65,9 @@ Hard rules:
 - All text shown to the player is in the spec language.
 - Keep it compact: aim for 150-400 lines. No comments explaining the API.`;
 
-export function codeUser(spec: GameSpec) {
+export function codeUser(spec: GameSpec, observations: string[] = []) {
   const p = AUDIENCE_PROFILES[spec.audience];
+  const obs = observations.length ? `\nPlay data from our platform for this audience and genre:\n${observations.map((o) => `- ${o}`).join("\n")}\n` : "";
   return `Game spec (JSON):
 ${JSON.stringify(spec, null, 2)}
 
@@ -76,7 +77,7 @@ Audience profile "${p.label}" — follow these constraints:
 - Visual style: ${p.paletteHint}.
 - Avoid: ${p.avoid.join("; ")}.
 - Notes: ${p.notes.join("; ")}.
-
+${obs}
 Write the complete game now.`;
 }
 

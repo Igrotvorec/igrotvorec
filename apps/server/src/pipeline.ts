@@ -5,6 +5,7 @@ import { checkGameCode, extractCode } from "./check";
 import { chatJson, chatStream } from "./llm";
 import * as prompts from "./prompts";
 import { addVersion, createGame, getGame, getVersion } from "./db";
+import { observationsFor } from "./stats";
 
 type Emit = (e: GenEvent) => void;
 
@@ -95,7 +96,9 @@ export async function generate(prompt: string, emit: Emit, signal: AbortSignal) 
   emit({ type: "stage", stage: "spec", message: "Разбираю запрос" });
   const spec = await makeSpec(prompts.SPEC_SYSTEM, prompts.specUser(prompt), signal);
   emit({ type: "spec", spec });
-  const code = await makeCode(spec, prompts.codeUser(spec), emit, signal);
+  const obs = observationsFor(spec.audience, spec.genre);
+  if (obs.lines.length) emit({ type: "stage", stage: "spec", message: `Учитываю статистику: ${obs.sessions} сессий` });
+  const code = await makeCode(spec, prompts.codeUser(spec, obs.lines), emit, signal);
   const gameId = createGame(prompt);
   await save(gameId, spec, code, prompt, started, emit);
 }
@@ -112,8 +115,20 @@ export async function edit(gameId: string, instruction: string, emit: Emit, sign
   await save(gameId, spec, code, instruction, started, emit);
 }
 
-/** Runtime-error repair reported by the preview. Never repairs a version that is itself a repair. */
+const repairing = new Set<string>();
+
+/** Исправление ошибки выполнения из превью. Не чинит версию, которая сама является исправлением. */
 export async function repair(versionId: string, error: string, emit: Emit, signal: AbortSignal) {
+  if (repairing.has(versionId)) throw new Error("Эта версия уже исправляется");
+  repairing.add(versionId);
+  try {
+    await repairOnce(versionId, error, emit, signal);
+  } finally {
+    repairing.delete(versionId);
+  }
+}
+
+async function repairOnce(versionId: string, error: string, emit: Emit, signal: AbortSignal) {
   const started = Date.now();
   const current = getVersion(versionId);
   if (!current) throw new Error("Версия не найдена");

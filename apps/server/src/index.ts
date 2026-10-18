@@ -7,6 +7,7 @@ import { config } from "./config";
 import { addEvent, gamePath, getGame, getVersion, listGames } from "./db";
 import { edit, generate, repair } from "./pipeline";
 import { playShell } from "./play";
+import { MIN_SESSIONS, segmentStats } from "./stats";
 
 const app = new Hono();
 
@@ -89,6 +90,8 @@ app.post("/api/repair", async (c) => {
 });
 
 app.get("/api/games", (c) => c.json(listGames()));
+
+app.get("/api/stats", (c) => c.json({ minSessions: MIN_SESSIONS, segments: segmentStats() }));
 
 app.get("/api/config", (c) => c.json({ publicUrl: config.publicUrl }));
 

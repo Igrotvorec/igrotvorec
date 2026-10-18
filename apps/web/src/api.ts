@@ -1,4 +1,4 @@
-import type { GameDetail, GameSummary, GenEvent } from "@gg/shared";
+import type { GameDetail, GameSummary, GenEvent, SegmentStatsDto } from "@gg/shared";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -10,6 +10,7 @@ async function json<T>(res: Response): Promise<T> {
 
 export const listGames = () => fetch("/api/games").then((r) => json<GameSummary[]>(r));
 export const getGame = (id: string) => fetch(`/api/games/${id}`).then((r) => json<GameDetail>(r));
+export const getStats = () => fetch("/api/stats").then((r) => json<{ minSessions: number; segments: SegmentStatsDto[] }>(r));
 export const getConfig = () => fetch("/api/config").then((r) => json<{ publicUrl: string }>(r));
 
 /** POSTs and reads the SSE response, calling onEvent for every event. Resolves when the stream ends. */
