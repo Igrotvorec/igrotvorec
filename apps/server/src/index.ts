@@ -44,7 +44,7 @@ const MAX_EVENTS_PER_SESSION = 200;
 const sessionEvents = new Map<string, number>();
 
 let running = 0;
-const MAX_CONCURRENT = 4;
+const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT ?? 8);
 
 /** Выполняет операцию пайплайна как SSE-поток с ping-сообщениями и жёстким дедлайном. */
 function sseOperation(run: (emit: (e: GenEvent) => void, signal: AbortSignal) => Promise<void>) {

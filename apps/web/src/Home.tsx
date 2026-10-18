@@ -62,7 +62,7 @@ export function Home() {
           </div>
         )}
         {op.running && <Progress op={op} onCancel={cancel} />}
-        {op.error && <p className="error">{op.error}</p>}
+        {op.error && <p className={op.error.startsWith("Не могу") ? "notice" : "error"}>{op.error}</p>}
       </section>
 
       <section className="gallery">
