@@ -45,6 +45,9 @@ if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some(
   db.exec("ALTER TABLE versions ADD COLUMN kind TEXT NOT NULL DEFAULT 'edit'");
   db.exec("UPDATE versions SET kind = 'repair' WHERE version > 1 AND instruction LIKE 'auto-fix: %'");
 }
+if (!(db.query("PRAGMA table_info(games)").all() as { name: string }[]).some((c) => c.name === "listed")) {
+  db.exec("ALTER TABLE games ADD COLUMN listed INTEGER NOT NULL DEFAULT 1");
+}
 // Версия 1 — всегда создание игры, даже если старая миграция приняла её за исправление по тексту.
 db.exec("UPDATE versions SET kind = 'create' WHERE version = 1 AND kind != 'create'");
 
@@ -74,9 +77,10 @@ const toVersion = (r: VersionRow): GameVersion => ({
   createdAt: r.created_at,
 });
 
-export function createGame(prompt: string): string {
+/** listed=false — игра доступна по ссылке, но не показывается в галерее (тестовые прогоны). */
+export function createGame(prompt: string, listed = true): string {
   const id = shortId();
-  db.query("INSERT INTO games (id, prompt, created_at) VALUES (?, ?, ?)").run(id, prompt, Date.now());
+  db.query("INSERT INTO games (id, prompt, created_at, listed) VALUES (?, ?, ?, ?)").run(id, prompt, Date.now(), listed ? 1 : 0);
   return id;
 }
 
@@ -139,6 +143,7 @@ export function getGame(id: string): GameDetail | null {
     genre: latest.spec.genre,
     palette: latest.spec.palette,
     latestVersionId: latest.id,
+    hasCover: Object.keys(JSON.parse((db.query("SELECT assets FROM versions WHERE id = ?").get(latest.id) as { assets: string }).assets || "{}")).length > 0,
     versions: history.length,
     createdAt: g.created_at,
     history,
@@ -148,12 +153,12 @@ export function getGame(id: string): GameDetail | null {
 export function listGames(limit = 60): GameSummary[] {
   const rows = db
     .query(
-      `SELECT g.id, g.prompt, g.created_at, v.id AS vid, v.spec, v.version
+      `SELECT g.id, g.prompt, g.created_at, v.id AS vid, v.spec, v.version, v.assets != '{}' AS has_cover
        FROM games g JOIN versions v ON v.game_id = g.id
-       WHERE v.version = (SELECT MAX(version) FROM versions WHERE game_id = g.id)
+       WHERE g.listed = 1 AND v.version = (SELECT MAX(version) FROM versions WHERE game_id = g.id)
        ORDER BY g.created_at DESC LIMIT ?`,
     )
-    .all(limit) as { id: string; prompt: string; created_at: number; vid: string; spec: string; version: number }[];
+    .all(limit) as { id: string; prompt: string; created_at: number; vid: string; spec: string; version: number; has_cover: number }[];
   return rows.map((r) => {
     const spec = JSON.parse(r.spec) as GameSpec;
     return {
@@ -164,6 +169,7 @@ export function listGames(limit = 60): GameSummary[] {
       genre: spec.genre,
       palette: spec.palette,
       latestVersionId: r.vid,
+      hasCover: r.has_cover === 1,
       versions: r.version,
       createdAt: r.created_at,
     };

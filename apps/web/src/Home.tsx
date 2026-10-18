@@ -85,13 +85,13 @@ export function Home() {
                 <span style={{ color: g.palette.text }}>{g.title}</span>
                 <i style={{ background: g.palette.primary }} />
                 <i style={{ background: g.palette.accent }} />
-                <img
+                {g.hasCover && <img
                   className="card-cover"
                   src={`/cover/${g.latestVersionId}`}
                   alt=""
                   loading="lazy"
                   onError={(e) => (e.currentTarget.style.display = "none")}
-                />
+                />}
               </div>
               <div className="card-meta">
                 <span>{GENRE_LABEL[g.genre]}</span>

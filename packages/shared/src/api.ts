@@ -20,6 +20,7 @@ export interface GameSummary {
   genre: GameSpec["genre"];
   palette: GameSpec["palette"];
   latestVersionId: string;
+  hasCover: boolean;
   versions: number;
   createdAt: number;
 }

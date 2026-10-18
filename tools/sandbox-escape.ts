@@ -104,7 +104,7 @@ const spec: GameSpec = {
   sprites: [],
 };
 
-const gameId = createGame("[sandbox-escape test]");
+const gameId = createGame("[sandbox-escape test]", false);
 const v = await addVersion({
   gameId,
   baseVersionId: null,
