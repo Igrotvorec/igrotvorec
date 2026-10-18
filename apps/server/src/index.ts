@@ -24,6 +24,25 @@ const GAME_CSP = [
   "frame-ancestors 'self'",
 ].join("; ");
 
+/**
+ * CSP для доверенной оболочки /play. Главное — frame-src 'self': вложенная игра не может
+ * сама перейти на чужой сайт (sandbox этого не запрещает), поэтому фишинг внутри страницы невозможен.
+ */
+const SHELL_CSP = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  "frame-src 'self'",
+  "connect-src 'self'",
+  "img-src 'self' data:",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join("; ");
+
+/** Лимит событий телеметрии на сессию, чтобы одним скриптом нельзя было накрутить статистику. */
+const MAX_EVENTS_PER_SESSION = 200;
+const sessionEvents = new Map<string, number>();
+
 let running = 0;
 const MAX_CONCURRENT = 4;
 
@@ -102,7 +121,11 @@ app.get("/api/games/:id", (c) => {
 
 app.post("/api/events", async (c) => {
   const body = EventBody.safeParse(await c.req.json().catch(() => null));
-  if (body.success && getVersion(body.data.versionId)) addEvent(body.data);
+  if (!body.success || !getVersion(body.data.versionId)) return c.body(null, 204);
+  const n = (sessionEvents.get(body.data.session) ?? 0) + 1;
+  if (sessionEvents.size > 50_000) sessionEvents.clear();
+  sessionEvents.set(body.data.session, n);
+  if (n <= MAX_EVENTS_PER_SESSION) addEvent(body.data);
   return c.body(null, 204);
 });
 
@@ -124,11 +147,21 @@ app.get("/play/:gameId", (c) => {
   if (!game) return c.text("Игра не найдена", 404);
   const wanted = c.req.query("v");
   const version = (wanted && game.history.find((v) => v.id === wanted || String(v.version) === wanted)) || game.history.at(-1)!;
-  return c.html(playShell({ title: version.spec.title, versionId: version.id, background: version.spec.palette.background }));
+  return c.html(playShell({ title: version.spec.title, versionId: version.id, background: version.spec.palette.background }), 200, {
+    "content-security-policy": SHELL_CSP,
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer",
+  });
 });
 
 app.use("/*", serveStatic({ root: config.webDist }));
-app.get("*", serveStatic({ path: `${config.webDist}/index.html` }));
+// SPA-fallback: root обязателен, иначе абсолютный путь склеивается с "./" и даёт 404.
+const spaIndex = serveStatic({ root: config.webDist, path: "index.html" });
+// Пути с расширением — это файлы: отсутствующий ассет должен давать 404, а не страницу.
+app.get("*", async (c, next) => {
+  if (/\.[a-z0-9]+$/i.test(c.req.path)) return c.notFound();
+  return (await spaIndex(c, next)) ?? c.notFound();
+});
 
 Bun.serve({ port: config.port, fetch: app.fetch, idleTimeout: 30 });
 console.log(`server on :${config.port}`);
