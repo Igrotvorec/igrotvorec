@@ -8,6 +8,7 @@ import { addEvent, gamePath, getGame, getVersion, listGames } from "./db";
 import { edit, generate, repair } from "./pipeline";
 import { playShell } from "./play";
 import { MIN_SESSIONS, segmentStats } from "./stats";
+import { spriteBytes } from "./assets";
 
 const app = new Hono();
 
@@ -140,6 +141,14 @@ app.get("/g/:versionId", async (c) => {
     "x-content-type-options": "nosniff",
     "cache-control": "public, max-age=31536000, immutable",
   });
+});
+
+app.get("/cover/:versionId", (c) => {
+  const v = getVersion(c.req.param("versionId"));
+  const first = v?.spec.sprites?.find((sp) => v.assets[sp.key]);
+  const bytes = first ? spriteBytes(v!.assets[first.key]!) : null;
+  if (!bytes) return c.notFound();
+  return c.body(bytes, 200, { "content-type": "image/webp", "cache-control": "public, max-age=31536000, immutable" });
 });
 
 app.get("/play/:gameId", (c) => {

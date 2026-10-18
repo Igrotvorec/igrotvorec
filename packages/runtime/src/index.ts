@@ -8,6 +8,8 @@ export interface KitConfig {
   uiScale: number;
   speed: number;
   hud?: boolean;
+  /** key → { src: data:URI или пусто, fallback: emoji } */
+  sprites?: Record<string, { src?: string; fallback: string }>;
 }
 
 const escapeHtml = (s: string) =>

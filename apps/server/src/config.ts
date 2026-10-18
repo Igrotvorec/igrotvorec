@@ -9,6 +9,8 @@ export const config = {
   llmApiKey: required("LLM_API_KEY"),
   specModel: process.env.SPEC_MODEL ?? "gpt-6.1-sol",
   codeModel: process.env.CODE_MODEL ?? "gpt-6.1-sol",
+  /** Модель картинок для спрайтов; пусто — спрайты не генерируются, игры рисуют emoji. */
+  imageModel: process.env.IMAGE_MODEL ?? "gpt-image-2.5",
   /** service_tier для запросов к LLM; "priority" включает fast-режим Sol. Пусто — не передаём. */
   serviceTier: process.env.LLM_SERVICE_TIER || undefined,
   port: Number(process.env.PORT ?? 8787),

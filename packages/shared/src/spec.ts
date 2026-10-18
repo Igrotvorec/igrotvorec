@@ -31,6 +31,16 @@ export const GameSpecSchema = z.object({
   difficulty: z.enum(["very_easy", "easy", "normal", "hard"]),
   roundSeconds: z.number().int().min(15).max(300),
   language: z.string().min(2).max(5),
+  /** Ключевые объекты, которые рисуются сгенерированными картинками; у каждого есть запасной emoji. */
+  sprites: z
+    .array(
+      z.object({
+        key: z.string().regex(/^[a-z][a-z0-9_]{0,15}$/),
+        description: z.string().min(1).max(200),
+        fallback: z.string().min(1).max(8),
+      }),
+    )
+    .max(3),
 });
 export type GameSpec = z.infer<typeof GameSpecSchema>;
 
@@ -40,7 +50,7 @@ const gameSpecJsonSchema = {
   additionalProperties: false,
   required: [
     "title", "audience", "genre", "concept", "coreMechanic", "controls", "howToPlay", "winCondition",
-    "loseCondition", "mustHave", "palette", "difficulty", "roundSeconds", "language",
+    "loseCondition", "mustHave", "palette", "difficulty", "roundSeconds", "language", "sprites",
   ],
   properties: {
     title: { type: "string" },
@@ -67,6 +77,19 @@ const gameSpecJsonSchema = {
     difficulty: { type: "string", enum: ["very_easy", "easy", "normal", "hard"] },
     roundSeconds: { type: "integer" },
     language: { type: "string" },
+    sprites: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["key", "description", "fallback"],
+        properties: {
+          key: { type: "string" },
+          description: { type: "string" },
+          fallback: { type: "string" },
+        },
+      },
+    },
   },
 } as const;
 

@@ -77,6 +77,7 @@ const spec: GameSpec = {
   difficulty: "normal",
   roundSeconds: 60,
   language: "ru",
+  sprites: [],
 };
 
 const gameId = createGame("[sandbox-escape test]");
@@ -86,6 +87,7 @@ const v = await addVersion({
   kind: "create",
   spec,
   code: ATTACKS,
+  assets: {},
   html: assembleGame({ title: spec.title, instructions: spec.howToPlay, palette: spec.palette, uiScale: 1, speed: 1 }, ATTACKS),
   instruction: "[sandbox-escape test]",
   model: "handcrafted",

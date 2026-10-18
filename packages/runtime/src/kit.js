@@ -169,6 +169,43 @@
     lose: function () { [392, 330, 262].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, "sawtooth", 0.1); }, i * 150); }); },
   };
 
+  // ---------- спрайты (data:URI, встроены в документ) ----------
+  var images = {};
+  function loadSprites() {
+    var list = cfg.sprites || {};
+    for (var key in list) {
+      var src = list[key] && list[key].src;
+      if (typeof src !== "string" || src.indexOf("data:image/") !== 0) continue;
+      var img = new Image();
+      img.src = src;
+      images[key] = img;
+    }
+  }
+  /** Рисует спрайт с сохранением пропорций внутри прямоугольника; пока картинки нет — emoji. */
+  function sprite(key, x, y, w, h, o) {
+    o = o || {};
+    h = h == null ? w : h;
+    var img = images[key];
+    ctx.save();
+    if (o.alpha != null) ctx.globalAlpha = Math.max(0, Math.min(1, o.alpha));
+    ctx.translate(x + w / 2, y + h / 2);
+    if (o.rotate) ctx.rotate(o.rotate);
+    if (o.flipX) ctx.scale(-1, 1);
+    if (img && img.complete && img.naturalWidth) {
+      var k = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+      var dw = img.naturalWidth * k;
+      var dh = img.naturalHeight * k;
+      ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    } else {
+      var fb = (cfg.sprites && cfg.sprites[key] && cfg.sprites[key].fallback) || "⭐";
+      ctx.font = Math.round(Math.min(w, h) * 0.85) + "px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(fb, 0, Math.min(w, h) * 0.04);
+    }
+    ctx.restore();
+  }
+
   // ---------- частицы ----------
   var parts = [];
   function particles(x, y, color, count) {
@@ -543,6 +580,10 @@
     tone: tone,
     vibrate: vibrate,
     particles: particles,
+    sprite: function (key, x, y, w, h, o) { sprite(key, x, y, w, h, o); },
+    /** Игра, которая рисует свой счётчик, выключает встроенный HUD, чтобы счёт не дублировался. */
+    showHud: function (on) { cfg.hud = !!on; },
+    hasSprite: function (key) { var img = images[key]; return !!(img && img.complete && img.naturalWidth); },
     rand: function (a, b) { return a + Math.random() * (b - a); },
     randInt: function (a, b) { return Math.floor(a + Math.random() * (b - a + 1)); },
     pick: function (arr) { return arr[Math.floor(Math.random() * arr.length)]; },
@@ -606,6 +647,7 @@
       resize();
       window.addEventListener("resize", resize);
       bindInput();
+      loadSprites();
       return kit;
     },
     boot: function () {

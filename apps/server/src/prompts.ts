@@ -31,6 +31,7 @@ Rules:
 - palette: four CSS hex colors suitable for the audience; text must contrast with background.
 - title: short, catchy, in the user's language. language: ISO code of the user's language (e.g. "ru").
 - concept, coreMechanic: 1-3 sentences each, concrete enough for a programmer.
+- sprites: 1-3 key visual objects that deserve illustrated art: the player character and/or the main collectible/target/obstacle (for match-3: up to 3 tile types). Not UI, buttons, backgrounds, text or tiny particles. key: short lowercase id (e.g. "player", "apple", "cone"); description: a vivid visual description in English for an illustrator (object only, no background); fallback: one emoji that looks similar.
 - No real-money mechanics, no violence for kids, no copyrighted characters by name.
 
 Output: {"allowed": boolean, "refusalReason": string, "spec": {...}}.
@@ -56,6 +57,7 @@ Input (only delivered while playing):
 - kit.onKey(fn(key, isDown)) key: "up"|"down"|"left"|"right"|"space"|"enter"; kit.keys[key] is true while held
 - kit.pointer = { x, y, down }
 Game flow:
+- kit.showHud(false)         hide the runtime score display (do it when you draw your own HUD)
 - kit.score (read/write integer), kit.addScore(n=1), kit.best
 - kit.win(message?) / kit.lose(message?)  end the round; the runtime shows the result screen with a restart button. Call once; after that onUpdate stops.
 - kit.state: "start" | "playing" | "won" | "lost"
@@ -63,6 +65,9 @@ Feedback:
 - kit.sfx(name) name: "tap" | "pop" | "coin" | "jump" | "hit" | "powerup" | "win" | "lose"  (win/lose are played automatically by kit.win/kit.lose)
 - kit.tone(freqHz, durSec, type="sine", volume=0.15, slideToHz?)
 - kit.vibrate(ms), kit.particles(x, y, color, count)  (particles are drawn and animated by the runtime)
+Sprites (AI-generated illustrations, already embedded):
+- kit.sprite(key, x, y, w, h?, { rotate?, flipX?, alpha? })  draws the sprite fitted into the box (x, y = top-left). If the image is missing it draws the fallback emoji, so always call it the same way.
+- Use the sprites listed in the spec for their objects instead of drawing those objects with primitives. Size them generously (at least 40 * kit.uiScale px).
 Drawing helpers (use ctx directly for anything else):
 - kit.text(str, x, y, { size=20, color, align="center", weight="700", baseline="middle" })
 - kit.roundRect(x, y, w, h, r, fill?, stroke?), kit.circle(x, y, r, fill?, stroke?)
@@ -77,7 +82,7 @@ Hard rules:
 - Do not create your own requestAnimationFrame/setInterval game loop; use kit.onUpdate. setTimeout only for short cosmetic effects.
 - Do not implement pause, start, restart or result screens and do not draw a pause button: the runtime already provides them.
 - Movement must be time-based (multiply by dt) and scaled by kit.speed.
-- Everything important stays within 0..360 x 0..640. Leave the top 56px for the score HUD (or draw your own HUD below it).
+- Everything important stays within 0..360 x 0..640. The runtime shows kit.score at the top center (top 56px). If you draw your own score/progress panel, call kit.showHud(false) once at the top level so the score is not shown twice.
 - Interactive targets are at least 48 * kit.uiScale logical px. Text at least 16 * kit.uiScale px.
 - Show remaining time/lives/goal on screen while playing so the player understands progress.
 - The round must end: implement both the win condition and the lose condition exactly as the spec says. Include a timer if the spec mentions one.

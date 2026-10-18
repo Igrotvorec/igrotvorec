@@ -6,13 +6,17 @@ import { chatJson, chatStream } from "./llm";
 import * as prompts from "./prompts";
 import { addVersion, createGame, getGame, getVersion } from "./db";
 import { observationsFor } from "./stats";
+import { generateSprites, settleSprites, type SpriteMap } from "./assets";
+
+/** Сколько ждать спрайты после готовности кода. */
+const SPRITE_GRACE_MS = 20_000;
 
 type Emit = (e: GenEvent) => void;
 
 /** Отказ по содержанию запроса: показывается пользователю как есть. */
 export class RefusalError extends Error {}
 
-function kitConfig(spec: GameSpec): KitConfig {
+function kitConfig(spec: GameSpec, assets: SpriteMap): KitConfig {
   const p = AUDIENCE_PROFILES[spec.audience];
   return {
     title: spec.title,
@@ -20,6 +24,7 @@ function kitConfig(spec: GameSpec): KitConfig {
     palette: spec.palette,
     uiScale: p.uiScale,
     speed: p.speedMultiplier,
+    sprites: Object.fromEntries((spec.sprites ?? []).map((s) => [s.key, { src: assets[s.key], fallback: s.fallback }])),
   };
 }
 
@@ -34,6 +39,18 @@ function normalizeSpec(raw: unknown): unknown {
   if (typeof r.language === "string") r.language = r.language.slice(0, 5);
   const pal = (r.palette && typeof r.palette === "object" ? r.palette : {}) as Record<string, unknown>;
   const hex = (v: unknown, fallback: string) => (typeof v === "string" && HEX_COLOR.test(v) ? v : fallback);
+  if (Array.isArray(r.sprites)) {
+    const seen = new Set<string>();
+    r.sprites = r.sprites
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+      .map((x) => ({
+        key: String(x.key ?? "").toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^[^a-z]+/, "").slice(0, 16),
+        description: String(x.description ?? "").slice(0, 200),
+        fallback: [...String(x.fallback ?? "⭐")].slice(0, 2).join("") || "⭐",
+      }))
+      .filter((x) => x.key && x.description && !seen.has(x.key) && seen.add(x.key))
+      .slice(0, 3);
+  } else r.sprites = [];
   r.palette = {
     background: hex(pal.background, "#10131a"),
     primary: hex(pal.primary, "#ffcc00"),
@@ -88,16 +105,21 @@ async function makeCode(spec: GameSpec, user: string, emit: Emit, signal: AbortS
 }
 
 async function save(
-  v: { gameId: string; baseVersionId: string | null; kind: VersionKind; spec: GameSpec; code: string; instruction: string; started: number },
+  v: { gameId: string; baseVersionId: string | null; kind: VersionKind; spec: GameSpec; code: string; assets: SpriteMap; instruction: string; started: number },
   emit: Emit,
   signal: AbortSignal,
 ) {
   // Последняя точка отмены: после неё версия публикуется целиком.
   signal.throwIfAborted();
   emit({ type: "stage", stage: "save", message: "Публикую игру" });
-  const html = assembleGame(kitConfig(v.spec), v.code, v.spec.language);
+  const html = assembleGame(kitConfig(v.spec, v.assets), v.code, v.spec.language);
   const saved = await addVersion({ ...v, html, model: config.codeModel, genMs: Date.now() - v.started });
   emit({ type: "done", gameId: v.gameId, versionId: saved.id, version: saved.version });
+}
+
+async function waitSprites(pending: Promise<SpriteMap>, emit: Emit): Promise<SpriteMap> {
+  emit({ type: "stage", stage: "check", message: "Дорисовываю графику" });
+  return settleSprites(pending, SPRITE_GRACE_MS);
 }
 
 export async function generate(prompt: string, emit: Emit, signal: AbortSignal) {
@@ -105,12 +127,14 @@ export async function generate(prompt: string, emit: Emit, signal: AbortSignal) 
   emit({ type: "stage", stage: "spec", message: "Разбираю запрос" });
   const spec = await makeSpec(prompts.SPEC_SYSTEM, prompts.specUser(prompt), signal);
   emit({ type: "spec", spec });
+  const sprites = generateSprites(spec, signal);
   const obs = observationsFor(spec.audience, spec.genre);
   if (obs.lines.length) emit({ type: "stage", stage: "spec", message: `Учитываю статистику: ${obs.sessions} сессий` });
   const code = await makeCode(spec, prompts.codeUser(spec, obs.lines), emit, signal);
+  const assets = await waitSprites(sprites, emit);
   signal.throwIfAborted();
   const gameId = createGame(prompt);
-  await save({ gameId, baseVersionId: null, kind: "create", spec, code, instruction: prompt, started }, emit, signal);
+  await save({ gameId, baseVersionId: null, kind: "create", spec, code, assets, instruction: prompt, started }, emit, signal);
 }
 
 export async function edit(gameId: string, instruction: string, emit: Emit, signal: AbortSignal) {
@@ -121,8 +145,16 @@ export async function edit(gameId: string, instruction: string, emit: Emit, sign
   emit({ type: "stage", stage: "spec", message: "Обновляю описание игры" });
   const spec = await makeSpec(prompts.EDIT_SPEC_SYSTEM, prompts.editSpecUser(current.spec, instruction), signal);
   emit({ type: "spec", spec });
+  // Спрайты с теми же ключами и описанием берём из прошлой версии, новые дорисовываем.
+  const reuse: SpriteMap = {};
+  for (const sp of spec.sprites) {
+    const old = current.spec.sprites?.find((o) => o.key === sp.key);
+    if (old && old.description === sp.description && current.assets[sp.key]) reuse[sp.key] = current.assets[sp.key]!;
+  }
+  const sprites = generateSprites(spec, signal, reuse);
   const code = await makeCode(spec, prompts.editUser(spec, current.code, instruction), emit, signal);
-  await save({ gameId, baseVersionId: current.id, kind: "edit", spec, code, instruction, started }, emit, signal);
+  const assets = await waitSprites(sprites, emit);
+  await save({ gameId, baseVersionId: current.id, kind: "edit", spec, code, assets, instruction, started }, emit, signal);
 }
 
 const repairing = new Set<string>();
@@ -148,7 +180,7 @@ async function repairOnce(versionId: string, error: string, emit: Emit, signal: 
   if (getGame(current.gameId)?.latestVersionId !== versionId) throw new Error("Можно исправить только последнюю версию");
   const code = await makeCode(current.spec, prompts.repairUser(current.spec, current.code, error.slice(0, 2000)), emit, signal);
   await save(
-    { gameId: current.gameId, baseVersionId: current.id, kind: "repair", spec: current.spec, code, instruction: `Автоисправление: ${error.split("\n")[0]!.slice(0, 200)}`, started },
+    { gameId: current.gameId, baseVersionId: current.id, kind: "repair", spec: current.spec, code, assets: current.assets, instruction: `Автоисправление: ${error.split("\n")[0]!.slice(0, 200)}`, started },
     emit,
     signal,
   );

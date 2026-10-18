@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_version ON events(version_id);
 `);
+if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some((c) => c.name === "assets")) {
+  db.exec("ALTER TABLE versions ADD COLUMN assets TEXT NOT NULL DEFAULT '{}'");
+}
 // Миграция: тип версии хранится отдельно, а не префиксом текста пользователя.
 if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some((c) => c.name === "kind")) {
   db.exec("ALTER TABLE versions ADD COLUMN kind TEXT NOT NULL DEFAULT 'edit'");
@@ -56,6 +59,7 @@ interface VersionRow {
   code: string;
   instruction: string;
   kind: VersionKind;
+  assets: string;
   created_at: number;
 }
 
@@ -88,6 +92,7 @@ export async function addVersion(v: {
   kind: VersionKind;
   spec: GameSpec;
   code: string;
+  assets: Record<string, string>;
   html: string;
   instruction: string;
   model: string;
@@ -101,8 +106,8 @@ export async function addVersion(v: {
     if ((latest?.id ?? null) !== v.baseVersionId) throw new ConflictError("Игра успела измениться, пока шла генерация. Повторите запрос.");
     const version = (latest?.version ?? 0) + 1;
     db.query(
-      "INSERT INTO versions (id, game_id, version, kind, spec, code, instruction, model, gen_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).run(id, v.gameId, version, v.kind, JSON.stringify(v.spec), v.code, v.instruction, v.model, v.genMs, Date.now());
+      "INSERT INTO versions (id, game_id, version, kind, spec, code, assets, instruction, model, gen_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(id, v.gameId, version, v.kind, JSON.stringify(v.spec), v.code, JSON.stringify(v.assets), v.instruction, v.model, v.genMs, Date.now());
     return version;
   });
   try {
@@ -113,9 +118,9 @@ export async function addVersion(v: {
   }
 }
 
-export function getVersion(id: string): (GameVersion & { code: string }) | null {
+export function getVersion(id: string): (GameVersion & { code: string; assets: Record<string, string> }) | null {
   const r = db.query("SELECT * FROM versions WHERE id = ?").get(id) as VersionRow | null;
-  return r ? { ...toVersion(r), code: r.code } : null;
+  return r ? { ...toVersion(r), code: r.code, assets: JSON.parse(r.assets || "{}") as Record<string, string> } : null;
 }
 
 export function getGame(id: string): GameDetail | null {
