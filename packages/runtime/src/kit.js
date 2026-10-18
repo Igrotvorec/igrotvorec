@@ -59,6 +59,12 @@
 
   post({ type: "boot" });
 
+  // Дополнительный барьер (не граница безопасности): прячем WebRTC до кода игры,
+  // потому что CSP connect-src не распространяется на ICE/STUN.
+  ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel"].forEach(function (name) {
+    try { Object.defineProperty(window, name, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+  });
+
   // ---------- хранилище (у оболочки; в sandbox-iframe localStorage недоступен) ----------
   var reqSeq = 0;
   var pending = {};

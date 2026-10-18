@@ -49,6 +49,24 @@ const ATTACKS = String.raw`
   attempt("string setTimeout", function () { return new Promise(function (ok, fail) { try { setTimeout("window.__x=1", 0); } catch (e) {} setTimeout(function () { window.__x ? ok("executed") : fail(new Error("string not executed")); }, 100); }); });
   // Отправку формы проверяем по сетевым ответам снаружи.
   try { var f = document.createElement("form"); f.action = "https://example.com/form"; f.method = "POST"; document.body.appendChild(f); f.submit(); } catch (e) {}
+  // WebRTC: CSP connect-src не распространяется на ICE. Если появится srflx-кандидат,
+  // значит STUN-сервер снаружи ответил, то есть канал наружу существует.
+  attempt("WebRTC STUN", function () {
+    return new Promise(function (ok, fail) {
+      if (typeof RTCPeerConnection === "undefined") return fail(new Error("RTCPeerConnection скрыт рантаймом"));
+      var pc;
+      try { pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }); } catch (e) { return fail(e); }
+      var done = false;
+      pc.onicecandidate = function (e) {
+        if (done) return;
+        if (e.candidate && / typ srflx /.test(e.candidate.candidate)) { done = true; ok("STUN ответил: " + e.candidate.candidate.split(" ")[4]); }
+        if (!e.candidate) { done = true; fail(new Error("только локальные кандидаты, STUN недоступен")); }
+      };
+      pc.createDataChannel("x");
+      pc.createOffer().then(function (o) { return pc.setLocalDescription(o); }).catch(fail);
+      setTimeout(function () { if (!done) { done = true; fail(new Error("STUN не ответил за 5 с")); } }, 5000);
+    });
+  });
   attempt("external script", function () { return new Promise(function (ok, fail) { var s = document.createElement("script"); s.onload = function () { ok("loaded"); }; s.onerror = function () { fail(new Error("script blocked")); }; s.src = "https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"; document.head.appendChild(s); }); });
   // Попытка через протокол оболочки: записать огромное значение и прочитать чужой ключ.
   var run = (location.hash.match(/run=([\w-]+)/) || [])[1];
@@ -61,7 +79,7 @@ const ATTACKS = String.raw`
   var arr = []; arr.gg = 1; arr.runId = run; arr.type = "error"; arr.message = new Array(1000000).join("z");
   parent.postMessage(arr, "*");
   // Самонавигация iframe на внешний сайт (фишинг внутри нашей страницы) — проверяется снаружи.
-  setTimeout(function () { location.href = "https://example.com/phish-inside-frame"; }, 1500);
+  setTimeout(function () { location.href = "https://example.com/phish-inside-frame"; }, 6000);
   kit.onStart(function () {});
   kit.onRender(function (ctx) { ctx.fillStyle = "#f00"; ctx.fillRect(0, 0, 50, 50); });
   if (false) kit.win();
@@ -113,6 +131,30 @@ let booted = false;
 const decorated = Object.assign([], { gg: 1, runId: "r1", type: "error", message: "z".repeat(1_000_000) });
 const hugeParsed = parseGameMessage({ gg: 1, runId: "r1", type: "error", message: "z".repeat(1_000_000) }, "r1");
 const hugeMessageAccepted = parseGameMessage(decorated, "r1") !== null || !hugeParsed || hugeParsed.type !== "error" || hugeParsed.message.length > 1000;
+/** Контроль: доходит ли STUN наружу из обычной страницы. Без этого «STUN не ответил» ничего не значит. */
+async function stunReachable(): Promise<boolean> {
+  const p = await browser.newPage();
+  try {
+    await p.goto(`${BASE}/stats`);
+    return await p.evaluate(
+      () =>
+        new Promise<boolean>((ok) => {
+          const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+          pc.onicecandidate = (e) => {
+            if (e.candidate && / typ srflx /.test(e.candidate.candidate)) ok(true);
+            if (!e.candidate) ok(false);
+          };
+          pc.createDataChannel("x");
+          pc.createOffer().then((o) => pc.setLocalDescription(o));
+          setTimeout(() => ok(false), 6000);
+        }),
+    );
+  } finally {
+    await p.close();
+  }
+}
+const stunControl = await stunReachable();
+
 try {
   const page = await browser.newPage();
   // Все сетевые запросы страницы и фрейма: разрешены только наш origin и data:.
@@ -142,7 +184,7 @@ try {
   });
   const resp = await page.goto(`${BASE}/play/${gameId}`, { waitUntil: "load" });
   playStatus = resp?.status() ?? 0;
-  await new Promise((r) => setTimeout(r, 4000));
+  await new Promise((r) => setTimeout(r, 8000));
 
   const topUrl = page.url();
   const frameUrls = page.frames().map((f) => f.url());
@@ -155,8 +197,15 @@ try {
   checks.push([playStatus === 200, `/play отвечает 200 (получено ${playStatus})`]);
   checks.push([booted, "игра загрузилась в iframe (пришёл boot)"]);
   console.log("\nАтаки изнутри игры:");
+  const unverified: string[] = [];
   for (const name of EXPECTED_ATTACKS) {
     const res = attacks[name];
+    // WebRTC засчитываем только если контрольный STUN без песочницы работает.
+    if (name === "WebRTC STUN" && !stunControl && res?.startsWith("BLOCKED") && res.includes("STUN")) {
+      unverified.push(name);
+      console.log(`  ? ${name.padEnd(24)} не проверено: STUN недоступен из этой сети даже без песочницы`);
+      continue;
+    }
     const ok = !!res && res.startsWith("BLOCKED");
     checks.push([ok, name]);
     console.log(`  ${ok ? "✔" : "✘"} ${name.padEnd(24)} ${res ? res.replace(/\s+/g, " ").slice(0, 110) : "НЕТ РЕЗУЛЬТАТА"}`);
@@ -174,7 +223,7 @@ try {
   for (const [ok, label] of outsideChecks) console.log(`  ${ok ? "✔" : "✘"} ${label}`);
   checks.push(...outsideChecks);
   const failed = checks.filter(([ok]) => !ok);
-  console.log(`\nИтог: ${checks.length - failed.length}/${checks.length} проверок пройдено`);
+  console.log(`\nИтог: ${checks.length - failed.length}/${checks.length} проверок пройдено${unverified.length ? `; не проверено: ${unverified.join(", ")}` : ""}`);
   if (failed.length) process.exitCode = 1;
 } finally {
   await browser.close();

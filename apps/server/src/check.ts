@@ -30,6 +30,9 @@ const FORBIDDEN_GLOBALS: Record<string, string> = {
   parent: "доступ к родительской странице",
   opener: "доступ к родительской странице",
   location: "навигация (location)",
+  RTCPeerConnection: "сеть (WebRTC)",
+  webkitRTCPeerConnection: "сеть (WebRTC)",
+  RTCDataChannel: "сеть (WebRTC)",
 };
 
 /** Свойства, запрещённые у любого объекта (window.fetch, navigator.sendBeacon, document.cookie...). */
