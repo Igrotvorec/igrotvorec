@@ -142,6 +142,428 @@
       "publisher": "LUNA games — разработчик и оператор игры"
     },
     "confidence": "medium",
-    "notes": "Тип: собственный HTML5/WebView-кейс разработчика на VK Mini Apps и других площадках, не общий benchmark жанра. Главные показатели привязаны к сентябрю 2026, но дата публикации страницы отсутствует; доступ 2026-10-18. ~17 минут — за день, ~8 — сессия; это округлённые разные метрики. +69% — относительное изменение D1, не процентные пункты и не итоговый D1; источник заявляет p=0.0001, но не публикует baseline, выборку и полный treatment. Эффект нельзя приписать отдельно merge, лигам или пожеланию. Rolling D1/D7 активной базы 43%/42% не включены как exact-day new-user retention. Недатированная карточка ниже страницы с day1-ret 51% и другими DAU/MAU противоречит датированному блоку и исключена. Возрастные данные страницы не дают оснований назначать игре seniors/kids/teens."
+    "notes": "Тип: собственный HTML5/WebView-кейс разработчика на VK Mini Apps и других площадках, не общий benchmark жанра. Главные показатели привязаны к сентябрю 2026, но дата публикации страницы отсутствует; доступ 2026-10-18. ~17 минут — за день, ~8 — сессия; это округлённые разные метрики. +69% — относительное изменение D1, не процентные пункты и не итоговый D1; источник заявляет p=0.0001, но не публикует baseline, выборку и полный treatment. Эффект нельзя приписать отдельно merge, лигам или пожеланию. Rolling D1/D7 активной базы 43%/42% не включены как exact-day new-user retention. Недатированная карточка ниже страницы с day1-ret 51% и другими DAU/MAU не согласована с датированным блоком: период и сопоставимость неизвестны, поэтому её цифры исключены. Возрастные данные страницы не дают оснований назначать игре seniors/kids/teens."
+  },
+  {
+    "id": "tbank-match3-leagues-rules-2023",
+    "genre": "match3",
+    "mechanic": "match-3 с недельными лигами и восстановлением одной жизни за 12 часов",
+    "audiences": ["general"],
+    "metrics": [],
+    "source": {
+      "title": "Запустили игру «Ряд наград» в приложении Т-Банка",
+      "url": "https://www.tbank.ru/finance/blog/match-three/",
+      "date": "2023-09-04",
+      "publisher": "Блог Т-Банка / АО «ТБанк»"
+    },
+    "confidence": "high",
+    "notes": "Тип: наблюдаемая механика из банковского первоисточника. Кампания была доступна 2023-09-04—2023-10-01: исторические, не текущие правила. 20 ходов за раунд, ограничения времени нет; пять стартовых жизней, каждая потраченная жизнь восстанавливается за 12 часов. Пять лиг с недельным продвижением/понижением; монеты за задания можно тратить на жизни и бустеры. Таймер жизни и число ходов — параметры дизайна, не KPI. Нет первичных D1/D7 или доказанного эффекта лиг. Публичные 3 млн / 36 млн вынесены отдельно как low secondary, банк их на этой странице не подтверждает. Дата — исходная публикация из JSON-LD, не обновление страницы 2026 года. Доступ 2026-10-18."
+  },
+  {
+    "id": "tbank-match3-reported-scale-secondary-2024",
+    "genre": "match3",
+    "mechanic": "match-3 с лигами: вторично заявленный масштаб «Ряда наград»",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "secondary_reported_participants",
+        "value": 3000000,
+        "unit": "participants",
+        "period": "Статья 2024-10-09; окно накопления не указано",
+        "denominator": "Участники по формулировке автора; уникальность и связь с конкретной волной кампании не раскрыты"
+      },
+      {
+        "name": "secondary_reported_games_played",
+        "value": 36000000,
+        "unit": "games",
+        "period": "Статья 2024-10-09; окно накопления не указано",
+        "denominator": "Сыгранные игры по формулировке автора; событие раунда/завершения/повтора не определено"
+      }
+    ],
+    "source": {
+      "title": "Как игра «три в ряд» привлекла 3 миллиона пользователей и усилила маркетинговую стратегию одного банка",
+      "url": "https://vc.ru/marketing/1559657-kak-igra-tri-v-ryad-privlekla-3-milliona-polzovatelei-i-usilila-marketingovuyu-strategiyu-odnogo-banka",
+      "date": "2024-10-09",
+      "publisher": "Евгений Федеров / vc.ru; автор упоминает свою связь с Cookies Games"
+    },
+    "confidence": "low",
+    "notes": "Тип: secondary_unverified_result. Статья сообщает 3 млн участников и 36 млн игр, но не ссылается на первичную аналитику, не задаёт период и не доказывает участие Cookies Games в разработке именно этого проекта. Нет доступного банковского подтверждения этих итогов. Не использовать для обещаний KPI и автоматического ранжирования. 6,8 млн выданных призов не включены как вовлечённость. Не вычислять 12 игр на пользователя: совпадение популяций и окон не установлено. Нельзя приписывать эти числа только исходной кампании сентября 2023 года. Доступ 2026-10-18; исторический вторичный отчёт."
+  },
+  {
+    "id": "tbank-vacation-runner-daily-rules-2024",
+    "genre": "runner",
+    "mechanic": "раннер с монетами, бустерами, ежедневной наградой и жизнью раз в 6 часов",
+    "audiences": ["general"],
+    "metrics": [],
+    "source": {
+      "title": "Запустили игру «Магия отпуска» в приложении Т-Банка",
+      "url": "https://www.tbank.ru/finance/blog/vacation-magic/",
+      "date": "2024-07-16",
+      "publisher": "Блог Т-Банка / АО «ТБанк»"
+    },
+    "confidence": "high",
+    "notes": "Тип: наблюдаемая механика. Доступность игры 2024-07-10—2024-08-27, не текущая акция. Избегать препятствий, собирать монеты, проходить уровни; четыре стартовые жизни, одна восстанавливается за шесть часов. Ежедневные входы дают награды; задания связаны с тревел-продуктами, бустерами и обменом монет на предложения в магазине. Числа уровней, заданий и призов не являются вовлечённостью. Банковский источник и firsthand-рассказ участницы команды не публикуют число игроков, время, retention или conversion. runner дополнительно явно назван участницей команды; ссылка в superapp-cases-notes.md. Нет оснований обещать эффективность daily reward или переносить сюда 12-часовое восстановление другой игры. Доступ 2026-10-18."
+  },
+  {
+    "id": "sber-word-daily-achievements-2023",
+    "genre": "puzzle",
+    "mechanic": "ежедневное слово из пяти букв, шесть попыток и достижения",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "reported_participants_approx",
+        "value": 350000,
+        "unit": "participants",
+        "period": "Шесть месяцев после запуска в августе 2022; точные границы не указаны; опубликовано 2023-02-05",
+        "denominator": "Люди, участвовавшие в «Ловлю на слове»; метод уникальности не опубликован"
+      },
+      {
+        "name": "reported_avg_time_per_user_undefined_horizon",
+        "value": 53,
+        "unit": "minutes/user",
+        "period": "В блоке результатов за шесть месяцев; отдельный горизонт среднего не определён",
+        "denominator": "Каждый пользователь по буквальной формулировке источника; не сессия и не день"
+      },
+      {
+        "name": "reported_avg_words_solved_per_user",
+        "value": 11,
+        "unit": "words/user",
+        "period": "В блоке результатов за шесть месяцев; отдельное окно среднего не определено",
+        "denominator": "Пользователи игры; не сессии и не визиты"
+      }
+    ],
+    "source": {
+      "title": "Поймали на слове: как новая геймификация от «СберСпасибо» привлекла 350 тысяч человек",
+      "url": "https://www.sostav.ru/publication/sberspasibo-58872.html",
+      "date": "2023-02-05",
+      "publisher": "Sostav; кейс со слов Дмитрия Завиши, директора по продукту СберСпасибо"
+    },
+    "confidence": "medium",
+    "notes": "Тип: brand_attributed_press_case, не независимо проверенная аналитика банковского сайта. Источник прямо говорит «в среднем каждый пользователь проводит в игре 53 минуты»; НЕ называть это 53-минутной сессией, дневным временем или оптимальным раундом. Не определён отдельный горизонт среднего. Новое слово раз в сутки; дополнительные попытки/раунды и бустеры связаны с бонусами, есть достижения. Причинный эффект daily word/ачивок не изолирован. 21 млн списанных бонусов — отдельная транзакционная величина, не призовой фонд и не retention; не включена. Возраст 30+ из поздних обзоров не доказан данным кейсом. Данные 2022–2023 годов устарели для прогноза 2026 года; доступ 2026-10-18."
+  },
+  {
+    "id": "alfa-alchemy-daily-goal-bank-2025",
+    "genre": "puzzle",
+    "mechanic": "соединение двух элементов, ежедневная цель, коллекции и достижения за серии дней",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "reported_avg_daily_playtime",
+        "value": 13,
+        "unit": "minutes/client/day",
+        "period": "Кейс 35-дневной игры в марте–апреле 2025, завершилась 2025-04-07; отдельное окно метрики не раскрыто",
+        "denominator": "Клиенты игры; правила усреднения по активным или календарным дням не раскрыты"
+      },
+      {
+        "name": "reported_target_action_activity_relative_difference",
+        "value": 48.7,
+        "unit": "% relative difference",
+        "period": "Кейс марта–апреля 2025; даты и название предыдущей игры не раскрыты",
+        "denominator": "Активность целевых действий относительно неназванной предыдущей игры; формула и абсолютные значения не опубликованы"
+      },
+      {
+        "name": "reported_task_conversion_lower_bound_exclusive",
+        "value": 10,
+        "unit": "%",
+        "period": "Кейс марта–апреля 2025; точное окно конверсии не раскрыто",
+        "denominator": "Количество выданных заданий, не количество игроков"
+      }
+    ],
+    "source": {
+      "title": "Как и зачем Альфа-Банк разрабатывает игры с помощью искусственного интеллекта",
+      "url": "https://vc.ru/alfabank/2017574-alfa-bank-igry-iskusstvennyj-intellekt",
+      "date": "2025-05-30",
+      "publisher": "Альфа-Банк — собственный аккаунт банка на vc.ru"
+    },
+    "confidence": "medium",
+    "notes": "Тип: банковский самоотчёт отдельного кейса «Алхимия акций». 13 минут явно В ДЕНЬ, не средняя сессия. Источник говорит «совершал целевые действия на 48,7% активнее»; формула не раскрыта, это не установленный причинный conversion lift, не процентные пункты и не рост новых клиентов/выручки. Конверсия строго >10% от выданных заданий; 10 — только строгая нижняя граница, не точный результат и не доля открывших счёт игроков. Сравнение с предыдущей игрой не рандомизировано. Попытки основной головоломки неограниченны; не добавлять жизни по аналогии с T-Банком. Призовой фонд 15 млн рублей исключён из вовлечённости. Не смешивать этот банковский набор с отдельно опубликованными показателями REB8T. Доступ 2026-10-18; исторический кейс 2025 года."
+  },
+  {
+    "id": "alfa-alchemy-creator-retention-case",
+    "genre": "puzzle",
+    "mechanic": "alchemy/merge с ежедневным открытием элементов: разработческий retention-кейс",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "creator_reported_retention_d7",
+        "value": 24,
+        "unit": "%",
+        "period": "Период когорт не опубликован; кейс опубликован 2026-06-28, сдача проекта отмечена как февраль 2025",
+        "denominator": "Когорта и событие возврата не определены в опубликованном кейсе"
+      },
+      {
+        "name": "creator_reported_avg_entries_per_player",
+        "value": 4.4,
+        "unit": "entries/player",
+        "period": "Окно накопления и событие входа не определены; не показатель за день",
+        "denominator": "Каждый игрок по формулировке разработчика"
+      }
+    ],
+    "source": {
+      "title": "Как увлечь клиентов банка на 76 лет: Алхимия акций — игра для Альфа-Банк Инвестиции",
+      "url": "https://workspace.ru/cases/kak-uvlech-klientov-banka-na-76-let-alhimiya-akciy-igra-dlya-alfa-bank-investicii/",
+      "date": "2026-06-28",
+      "publisher": "REB8T — проектная команда; публикация на Workspace"
+    },
+    "confidence": "medium",
+    "notes": "Тип: creator_self_report, отдельный от банковского набора. 24% — заявленный D7; 10% рядом в источнике является ПЛАНОМ, а не прежним наблюдаемым retention, поэтому uplift не вычислялся. Нет размеров/дат когорт и операционного определения D7. 4,4 входа — за неопределённое окно, не в день. Упоминаемые студией 13 минут не имеют единицы сессия/день; не объединены с банковскими 13 минутами в день. 76 лет суммарного времени, превышения планов MAU/регистраций и призовые суммы не используются как сопоставимый эффект механики. Дата публикации из JSON-LD; месяц сдачи не является датой публикации. Совпадение сборки, аудитории и окон с банковским 35-дневным кейсом не установлено; наборы не объединять. Доступ 2026-10-18."
+  },
+  {
+    "id": "ga-native-casual-median-dec2024",
+    "genre": "other",
+    "mechanic": "казуальные игры: внешний жанровый ориентир, не эффект отдельной механики",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "retention_d1_genre_median",
+        "value": 20.03,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025, исследование 2024-01-01—2024-12-31"
+      },
+      {
+        "name": "retention_d7_genre_median",
+        "value": 3.26,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      },
+      {
+        "name": "session_length_genre_median",
+        "value": 4,
+        "unit": "minutes",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      }
+    ],
+    "source": {
+      "title": "2025 Mobile Gaming Benchmarks — GameAnalytics, таблицы pp. 17–19",
+      "url": "https://investgame.net/wp-content/uploads/2025/02/2025-GameAnalytics-Mobile-Gaming-Benchmarks.pdf",
+      "date": null,
+      "publisher": "GameAnalytics; авторский PDF в зеркале InvestGame"
+    },
+    "confidence": "medium",
+    "notes": "Тип: native_mobile_genre_benchmark, исторический декабрь 2024. Исходная категория Casual, а не отдельно Hypercasual; other используется из-за согласованного enum, это не среднее всех other-игр. Отчёт обозначает показатели как median / 50% quantile, не top-25% и не среднее всей аудитории. Общая годовая выборка 11 600 iOS/Android игр; это НЕ размер подвыборки Casual и НЕ HTML5/WebView. D1, D7 и session взяты из одного месяца; daily playtime из соседней таблицы не подменяет session. Нельзя переносить числа в прогноз Билайна или выводить эффект конкретного дизайна. Дата публикации не установлена, издание 2025 не подменяется датой из пути файла; оригинальный landing указан в genre-benchmarks-notes.md. Доступ 2026-10-18."
+  },
+  {
+    "id": "ga-native-arcade-median-dec2024",
+    "genre": "arcade",
+    "mechanic": "аркады: внешний жанровый ориентир, не эффект отдельной механики",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "retention_d1_genre_median",
+        "value": 21.79,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025, исследование 2024-01-01—2024-12-31"
+      },
+      {
+        "name": "retention_d7_genre_median",
+        "value": 4.23,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      },
+      {
+        "name": "session_length_genre_median",
+        "value": 3.4,
+        "unit": "minutes",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      }
+    ],
+    "source": {
+      "title": "2025 Mobile Gaming Benchmarks — GameAnalytics, таблицы pp. 17–19",
+      "url": "https://investgame.net/wp-content/uploads/2025/02/2025-GameAnalytics-Mobile-Gaming-Benchmarks.pdf",
+      "date": null,
+      "publisher": "GameAnalytics; авторский PDF в зеркале InvestGame"
+    },
+    "confidence": "medium",
+    "notes": "Тип: native_mobile_genre_benchmark, категория Arcade. Месячные медианы / 50% quantile за декабрь 2024, не показатели одной успешной аркады и не причинный эффект жанра. Общий корпус отчёта: 11 600 нативных iOS/Android игр за 2024 год; размер подвыборки Arcade не определён здесь. Session length взят из нижней таблицы p.19, не из daily playtime. Нельзя выдавать за WebView-бенчмарк или оптимальную длину раунда. Исторические данные, издание 2025, точная дата публикации неизвестна. Авторский PDF GameAnalytics прочитан через зеркало, официальный landing и методология в genre-benchmarks-notes.md. Доступ 2026-10-18."
+  },
+  {
+    "id": "ga-native-puzzle-median-dec2024",
+    "genre": "puzzle",
+    "mechanic": "головоломки: внешний жанровый ориентир, не эффект отдельной механики",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "retention_d1_genre_median",
+        "value": 19.66,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025, исследование 2024-01-01—2024-12-31"
+      },
+      {
+        "name": "retention_d7_genre_median",
+        "value": 4.43,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      },
+      {
+        "name": "session_length_genre_median",
+        "value": 5.7,
+        "unit": "minutes",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      }
+    ],
+    "source": {
+      "title": "2025 Mobile Gaming Benchmarks — GameAnalytics, таблицы pp. 17–19",
+      "url": "https://investgame.net/wp-content/uploads/2025/02/2025-GameAnalytics-Mobile-Gaming-Benchmarks.pdf",
+      "date": null,
+      "publisher": "GameAnalytics; авторский PDF в зеркале InvestGame"
+    },
+    "confidence": "medium",
+    "notes": "Тип: native_mobile_genre_benchmark, категория Puzzle. Не считать отдельным Match-3, Word или Merge benchmark: такого разреза эти значения не дают. Медианы / 50% quantile одного месяца, декабрь 2024; общий годовой корпус 11 600 нативных iOS/Android игр, не число Puzzle-игр. Session length — не daily playtime и не рекомендуемый таймер. Не прогноз HTML5/WebView в супераппе и не доказательство эффекта конкретной механики. Издание 2025, публикационный день неизвестен, источник — авторский PDF в зеркале; официальный landing и страницы в genre-benchmarks-notes.md. Доступ 2026-10-18."
+  },
+  {
+    "id": "ga-native-board-median-dec2024",
+    "genre": "other",
+    "mechanic": "цифровые настольные игры: внешний жанровый ориентир",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "retention_d1_genre_median",
+        "value": 18,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025, исследование 2024-01-01—2024-12-31"
+      },
+      {
+        "name": "retention_d7_genre_median",
+        "value": 5.68,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      },
+      {
+        "name": "session_length_genre_median",
+        "value": 7.3,
+        "unit": "minutes",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      }
+    ],
+    "source": {
+      "title": "2025 Mobile Gaming Benchmarks — GameAnalytics, таблицы pp. 17–19",
+      "url": "https://investgame.net/wp-content/uploads/2025/02/2025-GameAnalytics-Mobile-Gaming-Benchmarks.pdf",
+      "date": null,
+      "publisher": "GameAnalytics; авторский PDF в зеркале InvestGame"
+    },
+    "confidence": "medium",
+    "notes": "Тип: native_mobile_genre_benchmark. Исходная категория Board; other — только техническое отображение в согласованный enum, не среднее остальных игр. Это не отдельный benchmark промо-ходилки с кубиком Билайна. Месячные медианы / 50% quantile за декабрь 2024, iOS/Android, не WebView. Общая годовая выборка 11 600 игр; размер Board-подвыборки здесь не раскрыт. Session length не является оптимальной длиной мини-игры. Историческое издание 2025; точная дата публикации неизвестна, авторский PDF доступен через зеркало. Методология и официальный landing в genre-benchmarks-notes.md. Доступ 2026-10-18."
+  },
+  {
+    "id": "ga-native-card-median-dec2024",
+    "genre": "other",
+    "mechanic": "карточные игры: внешний жанровый ориентир",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "retention_d1_genre_median",
+        "value": 18.22,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025, исследование 2024-01-01—2024-12-31"
+      },
+      {
+        "name": "retention_d7_genre_median",
+        "value": 6.45,
+        "unit": "%",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      },
+      {
+        "name": "session_length_genre_median",
+        "value": 8.5,
+        "unit": "minutes",
+        "period": "2024-12; месячная таблица из отчёта издания 2025"
+      }
+    ],
+    "source": {
+      "title": "2025 Mobile Gaming Benchmarks — GameAnalytics, таблицы pp. 17–19",
+      "url": "https://investgame.net/wp-content/uploads/2025/02/2025-GameAnalytics-Mobile-Gaming-Benchmarks.pdf",
+      "date": null,
+      "publisher": "GameAnalytics; авторский PDF в зеркале InvestGame"
+    },
+    "confidence": "medium",
+    "notes": "Тип: native_mobile_genre_benchmark. Исходная категория Card; other — техническое отображение, не общий результат всех other-игр. Медианы / 50% quantile одного месяца, декабрь 2024. Общая годовая выборка 11 600 нативных iOS/Android игр; размер Card-подвыборки не определён здесь. Не переносить на WebView, конкретный пасьянс или будущую мини-игру как обещанный KPI. Session length не равен round timer. Издание 2025, точная дата публикации не установлена; авторский PDF в зеркале, официальный landing и страницы в genre-benchmarks-notes.md. Доступ 2026-10-18."
+  },
+  {
+    "id": "adjust-native-hypercasual-context-2024",
+    "genre": "other",
+    "mechanic": "гиперказуальные игры: отдельный внешний ориентир Adjust",
+    "audiences": ["general"],
+    "metrics": [
+      {
+        "name": "reported_hypercasual_retention_d1",
+        "value": 27,
+        "unit": "%",
+        "period": "2024 global series; отчёт издания 2025, общая база отчёта январь 2023—март 2025"
+      },
+      {
+        "name": "reported_hypercasual_avg_session_length",
+        "value": 18.97,
+        "unit": "minutes/session",
+        "period": "2024 global series; отчёт издания 2025"
+      }
+    ],
+    "source": {
+      "title": "The gaming app insights report: 2025 edition — pp. 13, 22, 24",
+      "url": "https://investgame.net/wp-content/uploads/2025/05/gamingreport2025_ebook_en.pdf",
+      "date": null,
+      "publisher": "Adjust; авторский PDF в зеркале InvestGame"
+    },
+    "confidence": "medium",
+    "notes": "Тип: native_mobile_external_context, НЕ строка сопоставимой GameAnalytics-таблицы. Source category Hyper casual; other — отображение enum, не среднее всех прочих жанров и не обязательно runner/arcade/clicker. 27% относится к Hyper casual; 28% рядом в источнике — Hybrid casual. D7 не верифицирован и отсутствует, не подставлять 0, D30 или D7 ROAS. Отчёт использует смесь top-5000 apps Adjust и полной отслеживаемой базы; это не ровно 5000 игр или hypercasual-проектов. Деталей weighting/sessionization недостаточно для сведения 18,97 минуты со значениями GameAnalytics. Нельзя усреднять эти источники или обещать такой результат WebView-игре. Дата публикации не установлена; издание 2025, метрики 2024, доступ 2026-10-18. Официальный landing и audit в genre-benchmarks-notes.md."
+  },
+  {
+    "id": "esa-us-puzzle-generation-context-2024",
+    "genre": "puzzle",
+    "mechanic": "предпочтение категории Puzzle по поколениям: демографический контекст",
+    "audiences": ["adults"],
+    "metrics": [
+      {
+        "name": "puzzle_category_share_millennial_players",
+        "value": 61,
+        "unit": "%",
+        "period": "Отчёт 2024, выпуск 2024-05-16; fieldwork 23–31 октября, год в методологии не напечатан",
+        "denominator": "Опрошенные игроки США поколения Millennials; база жанровой диаграммы Total Players 8+, не все жители и не только mobile"
+      },
+      {
+        "name": "puzzle_category_share_genx_players",
+        "value": 66,
+        "unit": "%",
+        "period": "Отчёт 2024, выпуск 2024-05-16; fieldwork 23–31 октября, год не напечатан",
+        "denominator": "Опрошенные игроки США поколения Gen X в cross-platform выборке"
+      },
+      {
+        "name": "puzzle_category_share_boomers_silent_players",
+        "value": 72,
+        "unit": "%",
+        "period": "Отчёт 2024, выпуск 2024-05-16; fieldwork 23–31 октября, год не напечатан",
+        "denominator": "Опрошенные игроки США объединённой группы Boomers/Silent; не строгий сегмент 65+"
+      }
+    ],
+    "source": {
+      "title": "2024 Essential Facts About the U.S. Video Game Industry — печатные pp. 14, 30",
+      "url": "https://www.theesa.com/wp-content/uploads/2024/05/Essential-Facts-2024-FINAL.pdf",
+      "date": "2024-05-16",
+      "publisher": "Entertainment Software Association; исследование YouGov"
+    },
+    "confidence": "medium",
+    "notes": "Тип: demographic_context, не результат механики, не retention и не возрастной состав аудитории Puzzle. Доли относятся к игрокам внутри каждого поколения; не означают, что 72% всех игроков в головоломки — пожилые. Категории не взаимоисключающие, проценты нельзя нормировать до 100. Общая выборка: 5000 респондентов, из них 4000 игроков, играющих >=1 часа/неделю на смартфоне, планшете, PC, консоли или VR. Поколенческие подвыборки не раскрыты. Не переносить на Россию/Билайн/mobile-only или отдельные Word/Merge/Match-3 без собственного теста. audiences adults отмечает взрослые когорты, не строгий seniors65+. Gen Alpha/Gen Z не переименованы в kids/teens: у детской диаграммы есть ограничение 8+ и расхождение с пресс-релизом о возрасте 5–10. Данные исторические; дата выпуска проверена по официальному релизу, доступ 2026-10-18."
+  },
+  {
+    "id": "esa-us-older-generation-puzzle-context-2025",
+    "genre": "puzzle",
+    "mechanic": "предпочтение Puzzle у Boomers и Silent Generation: отдельный демографический срез",
+    "audiences": ["adults"],
+    "metrics": [
+      {
+        "name": "reported_puzzle_preference_boomers_silent_players",
+        "value": 73,
+        "unit": "%",
+        "period": "Исследование 2025, релиз 2025-06-03; fieldwork 11–25 февраля в контексте отчёта 2025",
+        "denominator": "Игроки США в объединённом обсуждении Boomers 61–79 лет и Silent Generation 80–90 лет; не доля всех игроков Puzzle"
+      }
+    ],
+    "source": {
+      "title": "Annual ESA Study Reveals Video Games’ Universal Appeal Across Generations",
+      "url": "https://www.theesa.com/annual-esa-study-reveals-video-games-universal-appeal-across-generations/",
+      "date": "2025-06-03",
+      "publisher": "Entertainment Software Association; исследование YouGov"
+    },
+    "confidence": "medium",
+    "notes": "Тип: demographic_context, отдельный опрос 2025, не HTML5/mobile benchmark и не эффект определённой головоломки. Общий опрос 5000 респондентов США; исходный размер старших игровых когорт не дан в используемом релизе. Нижняя возрастная граница Boomers 61 год, поэтому показатель нельзя честно подписать как seniors65+. Не вычитать 72% из другого опроса 2024 для доказанного тренда или смешивать респондентов. Предпочтение Puzzle не измеряет предпочтение конкретной механики или её retention. Доступ 2026-10-18; исторические данные 2025 года."
   }
 ]
