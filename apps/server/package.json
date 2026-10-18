@@ -1,0 +1,20 @@
+{
+  "name": "@gg/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3"
+  },
+  "dependencies": {
+    "@gg/runtime": "workspace:*",
+    "@gg/shared": "workspace:*",
+    "acorn": "^8.19.0",
+    "hono": "^4.13.13",
+    "openai": "^7.38.0",
+    "zod": "^4.6.7"
+  }
+}
