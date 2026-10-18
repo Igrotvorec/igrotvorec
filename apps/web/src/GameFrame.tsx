@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef } from "react";
 import { parseGameMessage } from "@gg/shared";
 
-export type FrameStatus =
+/** Every status names the version it came from, so a stale status never applies to another version. */
+export type FrameStatus = { versionId: string } & (
   | { kind: "loading" }
   | { kind: "ready" }
   | { kind: "error"; message: string }
-  | { kind: "stuck" };
+  | { kind: "stuck" }
+);
 
 const storeKey = (gameId: string, key: string) => `gg:/play/${gameId}:${key}`;
 
@@ -30,11 +32,11 @@ export function GameFrame({
   statusRef.current = onStatus;
 
   useEffect(() => {
-    statusRef.current({ kind: "loading" });
+    statusRef.current({ versionId, kind: "loading" });
     let booted = false;
     let failed = false;
     const timer = setTimeout(() => {
-      if (!booted) statusRef.current({ kind: "stuck" });
+      if (!booted) statusRef.current({ versionId, kind: "stuck" });
     }, 6000);
 
     const onMessage = (e: MessageEvent) => {
@@ -43,12 +45,12 @@ export function GameFrame({
       const m = parseGameMessage(e.data, runId);
       if (!m) return;
       if (m.type === "boot") booted = true;
-      else if (m.type === "ready" && !failed) statusRef.current({ kind: "ready" });
+      else if (m.type === "ready" && !failed) statusRef.current({ versionId, kind: "ready" });
       else if (m.type === "error") {
         if (failed) return;
         failed = true;
         const where = m.line ? ` (строка ${m.line}${m.col ? ":" + m.col : ""})` : "";
-        statusRef.current({ kind: "error", message: `${m.message}${where}${m.stack ? "\n" + m.stack : ""}` });
+        statusRef.current({ versionId, kind: "error", message: `${m.message}${where}${m.stack ? "\n" + m.stack : ""}` });
       } else if (m.type === "storage:get") {
         let value: string | null = null;
         try {
@@ -70,7 +72,7 @@ export function GameFrame({
       clearTimeout(timer);
       window.removeEventListener("message", onMessage);
     };
-  }, [gameId, runId]);
+  }, [gameId, versionId, runId]);
 
   return (
     <iframe

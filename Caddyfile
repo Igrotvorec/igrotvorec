@@ -1,0 +1,6 @@
+{$SITE_ADDRESS} {
+	# Generation endpoints stream SSE; keep them uncompressed so events flush immediately.
+	@compressible not path /api/*
+	encode @compressible zstd gzip
+	reverse_proxy app:8787
+}

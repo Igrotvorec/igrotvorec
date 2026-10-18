@@ -129,7 +129,7 @@
   var muted = false;
   function ensureAudio() {
     if (audio) {
-      if (audio.state === "suspended") audio.resume();
+      if (audio.state !== "running" && audio.state !== "closed") audio.resume();
       return audio;
     }
     var AC = window.AudioContext || window.webkitAudioContext;
@@ -217,7 +217,14 @@
     return e;
   }
 
+  var overlayShownAt = 0;
+  /** Result screens ignore input briefly so a frantic tap does not skip the score. */
+  function overlayClickable() {
+    return performance.now() - overlayShownAt > 700;
+  }
+
   function showOverlay(kind, message) {
+    overlayShownAt = kind === "won" || kind === "lost" ? performance.now() : 0;
     overlay.innerHTML = "";
     overlay.className = "gg-overlay gg-" + kind;
     var card = el("div", "gg-card");
@@ -246,6 +253,7 @@
     var b = el("button", "gg-btn", label);
     b.addEventListener("click", function (e) {
       e.stopPropagation();
+      if (!overlayClickable()) return;
       ensureAudio();
       SFX.tap();
       fn();
@@ -280,6 +288,7 @@
   }
 
   function pause() {
+    releaseAll();
     if (state !== "playing" || paused) return;
     paused = true;
     if (audio && audio.state === "running") audio.suspend();
@@ -370,12 +379,31 @@
   // ---------- input ----------
   var pointer = { x: 0, y: 0, down: false };
   var keys = {};
-  var swipeStart = null;
+  /** Active gestures by pointerId, so multi-touch never mixes up taps and swipes. */
+  var gestures = {};
+  var SWIPE_PX = 30;
   var inputReported = false;
   function markInput() {
     if (!inputReported) {
       inputReported = true;
       post({ type: "input" });
+    }
+  }
+  function anyDown() {
+    for (var id in gestures) return true;
+    return false;
+  }
+  function swipeDir(dx, dy) {
+    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+  }
+  function releaseAll() {
+    gestures = {};
+    pointer.down = false;
+    for (var k in keys) {
+      if (keys[k]) {
+        keys[k] = false;
+        if (state === "playing") call(handlers.key, [k, false], "onKey");
+      }
     }
   }
 
@@ -388,35 +416,39 @@
       pointer.x = p.x;
       pointer.y = p.y;
       pointer.down = true;
-      swipeStart = { x: p.x, y: p.y, t: performance.now() };
+      gestures[e.pointerId] = { x: p.x, y: p.y, swiped: false };
       try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
-      if (state === "playing" && !paused) {
-        call(handlers.down, [p.x, p.y, e.pointerId], "onPointerDown");
-      }
+      if (state === "playing" && !paused) call(handlers.down, [p.x, p.y, e.pointerId], "onPointerDown");
     });
     canvas.addEventListener("pointermove", function (e) {
       var p = toLogical(e.clientX, e.clientY);
       pointer.x = p.x;
       pointer.y = p.y;
-      if (state === "playing" && !paused) call(handlers.move, [p.x, p.y, e.pointerId], "onPointerMove");
+      if (state !== "playing" || paused) return;
+      call(handlers.move, [p.x, p.y, e.pointerId], "onPointerMove");
+      var g = gestures[e.pointerId];
+      // Fire the swipe as soon as the finger travels far enough: slow swipes count too.
+      if (g && !g.swiped) {
+        var dx = p.x - g.x;
+        var dy = p.y - g.y;
+        if (dx * dx + dy * dy > SWIPE_PX * SWIPE_PX) {
+          g.swiped = true;
+          call(handlers.swipe, [swipeDir(dx, dy)], "onSwipe");
+        }
+      }
     });
     function up(e, cancelled) {
       var p = toLogical(e.clientX, e.clientY);
-      pointer.down = false;
+      var g = gestures[e.pointerId];
+      delete gestures[e.pointerId];
+      pointer.down = anyDown();
       if (state !== "playing" || paused) return;
       call(handlers.up, [p.x, p.y, e.pointerId], "onPointerUp");
-      if (cancelled || !swipeStart) return;
-      var dx = p.x - swipeStart.x;
-      var dy = p.y - swipeStart.y;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      var dtm = performance.now() - swipeStart.t;
-      swipeStart = null;
-      if (dist > 30 && dtm < 600) {
-        var dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
-        call(handlers.swipe, [dir], "onSwipe");
-      } else if (dist <= 30) {
-        call(handlers.tap, [p.x, p.y], "onTap");
-      }
+      if (cancelled || !g || g.swiped) return;
+      var dx = p.x - g.x;
+      var dy = p.y - g.y;
+      if (dx * dx + dy * dy > SWIPE_PX * SWIPE_PX) call(handlers.swipe, [swipeDir(dx, dy)], "onSwipe");
+      else call(handlers.tap, [p.x, p.y], "onTap");
     }
     canvas.addEventListener("pointerup", function (e) { up(e, false); });
     canvas.addEventListener("pointercancel", function (e) { up(e, true); });
@@ -429,7 +461,8 @@
       ensureAudio();
       markInput();
       if (state !== "playing") {
-        if ((k === "space" || k === "enter") && state !== "playing") startRound();
+        // Ignore auto-repeat so a held key does not skip the result screen.
+        if (!e.repeat && (k === "space" || k === "enter") && overlayClickable()) startRound();
         return;
       }
       if (paused) return;
@@ -452,7 +485,10 @@
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) pause();
     });
-    window.addEventListener("blur", function () { pause(); });
+    window.addEventListener("blur", function () {
+      releaseAll();
+      pause();
+    });
   }
 
   // ---------- smoke test: exercise callbacks before the player starts ----------

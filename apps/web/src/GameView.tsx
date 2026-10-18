@@ -14,7 +14,7 @@ export function GameView({ id }: { id: string }) {
   const [game, setGame] = useState<GameDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [status, setStatus] = useState<FrameStatus>({ kind: "loading" });
+  const [status, setStatus] = useState<FrameStatus | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [instruction, setInstruction] = useState("");
   const [opKind, setOpKind] = useState<"edit" | "repair">("edit");
@@ -37,6 +37,8 @@ export function GameView({ id }: { id: string }) {
   }, [load]);
 
   const { state: op, run, cancel } = useOperation(() => {
+    // The version that was latest is now superseded; never auto-repair it after the fact.
+    if (game) repairedRef.current.add(game.latestVersionId);
     setInstruction("");
     load(true);
   });
@@ -47,7 +49,7 @@ export function GameView({ id }: { id: string }) {
 
   // One automatic repair for a runtime error in the latest version (never for a repair itself).
   useEffect(() => {
-    if (status.kind !== "error" || !version || !isLatest || op.running) return;
+    if (!status || status.kind !== "error" || !version || status.versionId !== version.id || !isLatest || op.running) return;
     if (version.instruction.startsWith(REPAIR_PREFIX) || repairedRef.current.has(version.id)) return;
     repairedRef.current.add(version.id);
     setOpKind("repair");
@@ -141,7 +143,7 @@ export function GameView({ id }: { id: string }) {
           <GameFrame gameId={game.id} versionId={version.id} reloadKey={reloadKey} onStatus={setStatus} />
         </div>
         <div className="frame-status">
-          <StatusLine status={status} repairing={repairing} />
+          <StatusLine status={status?.versionId === version.id ? status : null} repairing={repairing} />
           <button type="button" className="btn-ghost" onClick={() => setReloadKey((n) => n + 1)}>
             Перезапустить
           </button>
@@ -151,8 +153,9 @@ export function GameView({ id }: { id: string }) {
   );
 }
 
-function StatusLine({ status, repairing }: { status: FrameStatus; repairing: boolean }) {
+function StatusLine({ status, repairing }: { status: FrameStatus | null; repairing: boolean }) {
   if (repairing) return <span className="status warn">Нашли ошибку, исправляем</span>;
+  if (!status) return <span className="status">Запуск…</span>;
   switch (status.kind) {
     case "loading":
       return <span className="status">Запуск…</span>;
