@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { parseGameMessage } from "@gg/shared";
 
-/** Every status names the version it came from, so a stale status never applies to another version. */
+/** Каждый статус помнит свою версию, поэтому устаревший статус не применится к другой. */
 export type FrameStatus = { versionId: string } & (
   | { kind: "loading" }
   | { kind: "ready" }
@@ -12,8 +12,8 @@ export type FrameStatus = { versionId: string } & (
 const storeKey = (gameId: string, key: string) => `gg:/play/${gameId}:${key}`;
 
 /**
- * Sandboxed game iframe acting as the trusted shell: answers storage requests and reports
- * runtime diagnostics. Same protocol as the /play page.
+ * Игра в sandbox-iframe; компонент работает доверенной оболочкой: отвечает на запросы хранилища
+ * и передаёт диагностику рантайма. Протокол тот же, что у страницы /play.
  */
 export function GameFrame({
   gameId,
@@ -56,14 +56,14 @@ export function GameFrame({
         try {
           value = localStorage.getItem(storeKey(gameId, m.key));
         } catch {
-          /* storage unavailable */
+          /* хранилище недоступно */
         }
         win.postMessage({ gg: 1, type: "storage:value", reqId: m.reqId, value }, "*");
       } else if (m.type === "storage:set") {
         try {
           localStorage.setItem(storeKey(gameId, m.key), m.value);
         } catch {
-          /* storage unavailable */
+          /* хранилище недоступно */
         }
       }
     };

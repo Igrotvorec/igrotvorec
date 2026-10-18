@@ -1,7 +1,7 @@
 /**
- * Dev-only playtest driver (not part of the generation pipeline).
- * Opens /play/:gameId in local Chrome at phone size, reads runtime messages, presses Play,
- * sends taps/swipes for a few seconds and saves screenshots.
+ * Плейтест для разработки (не часть пайплайна генерации).
+ * Открывает /play/:gameId в локальном Chrome с размером телефона, читает сообщения рантайма,
+ * жмёт «Играть», несколько секунд шлёт тапы и свайпы и сохраняет скриншоты.
  *
  *   bun tools/try-game.ts <gameId> [outDir] [baseUrl]
  */

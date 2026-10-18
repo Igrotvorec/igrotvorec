@@ -1,7 +1,7 @@
 import { AUDIENCE_PROFILES, type Audience, type Genre, type SegmentStatsDto } from "@gg/shared";
 import { db } from "./db";
 
-/** Minimum sessions in a segment before its observations are allowed to steer generation. */
+/** Сколько сессий нужно в сегменте, прежде чем его наблюдения начнут влиять на генерацию. */
 export const MIN_SESSIONS = 5;
 
 export type SegmentStats = SegmentStatsDto;
@@ -15,7 +15,7 @@ interface Row {
   play_ms: number | null;
 }
 
-/** Aggregates /play telemetry per audience × genre. Denominators are reported, not hidden. */
+/** Агрегирует телеметрию /play по «аудитория × жанр». Знаменатели показываются, а не прячутся. */
 export function segmentStats(): SegmentStats[] {
   const rows = db
     .query(
@@ -64,8 +64,8 @@ export function segmentStats(): SegmentStats[] {
 const pct = (a: number, b: number) => `${Math.round((a / b) * 100)}%`;
 
 /**
- * Turns observed play data for the target segment into concrete generation guidance.
- * Returns nothing when the segment is too small to say anything.
+ * Превращает наблюдения по целевому сегменту в конкретные указания для генерации.
+ * Если данных мало, ничего не возвращает.
  */
 export function observationsFor(audience: Audience, genre: Genre): { lines: string[]; sessions: number } {
   const all = segmentStats();
@@ -81,7 +81,7 @@ export function observationsFor(audience: Audience, genre: Genre): { lines: stri
     if (seg.avgRoundSec != null && seg.avgRoundSec < profile.roundSeconds[0] / 2) lines.push(`Rounds end much faster than the intended ${profile.roundSeconds[0]}s: reduce early-game punishment.`);
   }
 
-  // Cross-genre signal for the same audience: which genres get replayed most.
+  // Сигнал по другим жанрам той же аудитории: какие жанры переигрывают чаще.
   const sameAudience = all.filter((s) => s.audience === audience && s.sessions >= MIN_SESSIONS);
   if (sameAudience.length >= 2) {
     const ranked = [...sameAudience].sort((a, b) => b.replaySessions / b.sessions - a.replaySessions / a.sessions);

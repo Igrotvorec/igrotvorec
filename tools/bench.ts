@@ -1,7 +1,7 @@
 /**
- * Dev-only benchmark: generates games for a prompt set, then playtests each.
+ * Бенчмарк для разработки: генерирует игры по набору промптов и плейтестит каждую.
  *   bun tools/bench.ts [promptsFile] [concurrency]
- * promptsFile: one prompt per line (default: built-in set). Writes data/bench-<ts>.json.
+ * promptsFile: по промпту на строку (по умолчанию встроенный набор). Результат в data/bench-<ts>.json.
  */
 import type { GenEvent } from "../packages/shared/src/api";
 import { tryGame } from "./try-game";

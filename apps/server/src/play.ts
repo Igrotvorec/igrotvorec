@@ -1,6 +1,6 @@
 /**
- * Trusted /play shell: full-screen page that hosts the generated game in a sandboxed iframe,
- * owns storage (the opaque-origin game cannot use localStorage) and forwards telemetry.
+ * Доверенная оболочка /play: полноэкранная страница, которая держит игру в sandbox-iframe,
+ * владеет хранилищем (у игры с opaque origin нет localStorage) и отправляет телеметрию.
  */
 export function playShell(opts: { title: string; versionId: string; background: string }): string {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);

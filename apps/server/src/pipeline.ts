@@ -22,7 +22,7 @@ function kitConfig(spec: GameSpec): KitConfig {
   };
 }
 
-/** Clamp harmless overflows (long strings, too many items) instead of failing the whole generation. */
+/** Обрезает безобидные превышения (длинные строки, лишние пункты), чтобы не валить всю генерацию. */
 function normalizeSpec(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
   const r = { ...(raw as Record<string, unknown>) };
@@ -57,8 +57,8 @@ async function makeSpec(system: string, user: string, signal: AbortSignal): Prom
 }
 
 /**
- * Generate code, statically check it, and allow exactly one LLM fix if the check fails.
- * Returns checked code or throws with the remaining errors.
+ * Генерирует код, проверяет его статически и даёт ровно одну попытку исправления через LLM.
+ * Возвращает проверенный код или бросает ошибку с оставшимися проблемами.
  */
 async function makeCode(spec: GameSpec, user: string, emit: Emit, signal: AbortSignal): Promise<string> {
   emit({ type: "stage", stage: "code", message: "Пишу код игры" });
@@ -133,8 +133,8 @@ async function repairOnce(versionId: string, error: string, emit: Emit, signal: 
   const current = getVersion(versionId);
   if (!current) throw new Error("Версия не найдена");
   if (current.instruction.startsWith(REPAIR_PREFIX)) throw new Error("Автоисправление уже применялось к этой версии");
-  // Only the latest version may be repaired: a repair becomes the new latest, so this also
-  // caps repairs at one per version and never overwrites newer edits.
+  // Чинить можно только последнюю версию: исправление само становится последней, поэтому
+  // на версию приходится не больше одного исправления и более новые правки не затираются.
   if (getGame(current.gameId)?.latestVersionId !== versionId) throw new Error("Можно исправить только последнюю версию");
   const code = await makeCode(current.spec, prompts.repairUser(current.spec, current.code, error.slice(0, 2000)), emit, signal);
   await save(current.gameId, current.spec, code, REPAIR_PREFIX + error.slice(0, 200), started, emit);

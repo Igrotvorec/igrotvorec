@@ -11,7 +11,7 @@ import { MIN_SESSIONS, segmentStats } from "./stats";
 
 const app = new Hono();
 
-/** CSP for generated game documents: opaque origin, no network, inline code only. */
+/** CSP для документов игр: opaque origin, без сети, только встроенный код. */
 const GAME_CSP = [
   "sandbox allow-scripts",
   "default-src 'none'",
@@ -27,7 +27,7 @@ const GAME_CSP = [
 let running = 0;
 const MAX_CONCURRENT = 4;
 
-/** Runs a pipeline operation as an SSE stream with keepalive pings and a hard deadline. */
+/** Выполняет операцию пайплайна как SSE-поток с ping-сообщениями и жёстким дедлайном. */
 function sseOperation(run: (emit: (e: GenEvent) => void, signal: AbortSignal) => Promise<void>) {
   return (c: Context) =>
     streamSSE(c, async (stream) => {

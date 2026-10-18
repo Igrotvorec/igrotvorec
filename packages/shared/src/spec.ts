@@ -15,11 +15,11 @@ export const GameSpecSchema = z.object({
   concept: z.string().min(1).max(400),
   coreMechanic: z.string().min(1).max(400),
   controls: z.string().min(1).max(200),
-  /** One short line for the start screen. */
+  /** Одна короткая строка для стартового экрана. */
   howToPlay: z.string().min(1).max(120),
   winCondition: z.string().min(1).max(200),
   loseCondition: z.string().min(1).max(200),
-  /** Rules the user explicitly asked for; repair and edits must keep them. */
+  /** Правила, которые пользователь попросил явно; исправления и правки обязаны их сохранить. */
   mustHave: z.array(z.string().max(200)).max(8),
   palette: z.object({
     background: HexColor,
@@ -33,7 +33,7 @@ export const GameSpecSchema = z.object({
 });
 export type GameSpec = z.infer<typeof GameSpecSchema>;
 
-/** JSON schema handed to the LLM for structured output. Kept in sync with GameSpecSchema by hand. */
+/** JSON-схема для structured output LLM. Синхронизируется с GameSpecSchema вручную. */
 export const gameSpecJsonSchema = {
   type: "object",
   additionalProperties: false,

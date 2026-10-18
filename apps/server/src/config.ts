@@ -12,7 +12,7 @@ export const config = {
   port: Number(process.env.PORT ?? 8787),
   dataDir: process.env.DATA_DIR ?? "./data",
   publicUrl: process.env.PUBLIC_URL ?? "http://localhost:5173",
-  /** Hard deadline for one generate/edit/repair operation. */
+  /** Жёсткий дедлайн одной операции генерации, правки или исправления. */
   operationTimeoutMs: Number(process.env.OPERATION_TIMEOUT_MS ?? 240_000),
   webDist: process.env.WEB_DIST ?? new URL("../../web/dist", import.meta.url).pathname,
 };

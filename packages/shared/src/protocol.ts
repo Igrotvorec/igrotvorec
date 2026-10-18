@@ -1,7 +1,7 @@
 /**
- * postMessage protocol between a sandboxed game iframe (opaque origin) and the trusted shell
- * (the generator preview or the /play page). Every message carries `gg: 1` and the runId the
- * shell assigned, so a stale iframe cannot report into a newer run.
+ * Протокол postMessage между игрой в sandbox-iframe (opaque origin) и доверенной оболочкой
+ * (превью генератора или страница /play). Каждое сообщение несёт `gg: 1` и runId, выданный
+ * оболочкой, поэтому старый iframe не может писать в новый запуск.
  */
 
 export type GameToShell =
@@ -24,7 +24,7 @@ export const MAX_STORAGE_VALUE = 2048;
 
 const GAME_TYPES = new Set(["boot", "ready", "frame", "input", "error", "state", "storage:get", "storage:set"]);
 
-/** Shape-check an untrusted message from a game iframe. */
+/** Проверяет форму недоверенного сообщения от игры. */
 export function parseGameMessage(data: unknown, runId: string): GameToShell | null {
   if (!data || typeof data !== "object") return null;
   const m = data as Record<string, unknown>;

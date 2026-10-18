@@ -37,7 +37,7 @@ export function GameView({ id }: { id: string }) {
   }, [load]);
 
   const { state: op, run, cancel } = useOperation(() => {
-    // The version that was latest is now superseded; never auto-repair it after the fact.
+    // Бывшая последняя версия заменена новой — автоисправлять её уже не нужно.
     if (game) repairedRef.current.add(game.latestVersionId);
     setInstruction("");
     load(true);
@@ -47,7 +47,7 @@ export function GameView({ id }: { id: string }) {
   const version = game?.history.find((v) => v.id === selected) ?? game?.history.at(-1);
   const isLatest = !!game && version?.id === game.latestVersionId;
 
-  // One automatic repair for a runtime error in the latest version (never for a repair itself).
+  // Одно автоисправление ошибки выполнения в последней версии (но не в самом исправлении).
   useEffect(() => {
     if (!status || status.kind !== "error" || !version || status.versionId !== version.id || !isLatest || op.running) return;
     if (version.instruction.startsWith(REPAIR_PREFIX) || repairedRef.current.has(version.id)) return;

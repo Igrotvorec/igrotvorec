@@ -1,14 +1,13 @@
 import type { Audience, Genre } from "./spec";
 
 /**
- * Audience profiles: concrete design constraints the generator applies per target audience.
- * Seed values are design heuristics plus public super-app observations; `sources` says which.
- * Data-collection agents replace/extend these with sourced numbers.
+ * Профили аудиторий: конкретные ограничения дизайна, которые генератор применяет к целевой аудитории.
+ * Стартовые значения — эвристики и публичные наблюдения по суперапкам; что есть что, указано в `sources`.
  */
 export interface AudienceProfile {
   id: Audience;
   label: string;
-  /** Multiplier for runtime UI (buttons, fonts). 1 = default 48px hit target. */
+  /** Множитель UI рантайма (кнопки, шрифты). 1 — стандартная цель 48px. */
   uiScale: number;
   minTapTargetPx: number;
   minFontPx: number;

@@ -13,7 +13,7 @@ export const getGame = (id: string) => fetch(`/api/games/${id}`).then((r) => jso
 export const getStats = () => fetch("/api/stats").then((r) => json<{ minSessions: number; segments: SegmentStatsDto[] }>(r));
 export const getConfig = () => fetch("/api/config").then((r) => json<{ publicUrl: string }>(r));
 
-/** POSTs and reads the SSE response, calling onEvent for every event. Resolves when the stream ends. */
+/** Делает POST и читает SSE-ответ, вызывая onEvent на каждое событие. Завершается вместе с потоком. */
 export async function streamOp(url: string, body: unknown, onEvent: (e: GenEvent) => void, signal?: AbortSignal) {
   const res = await fetch(url, {
     method: "POST",
@@ -44,7 +44,7 @@ export async function streamOp(url: string, body: unknown, onEvent: (e: GenEvent
       try {
         onEvent(JSON.parse(data) as GenEvent);
       } catch {
-        /* ignore malformed event */
+        /* битое событие пропускаем */
       }
     }
   }

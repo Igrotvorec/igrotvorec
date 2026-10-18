@@ -2,8 +2,8 @@ import OpenAI from "openai";
 import { config } from "./config";
 
 /**
- * Single OpenAI-compatible client (cliproxyapi). SDK retries are disabled: the pipeline owns
- * retries (one repair at most) and the operation deadline, so latency numbers stay honest.
+ * Единый OpenAI-совместимый клиент (cliproxyapi). Повторы SDK отключены: повторами (не больше
+ * одного исправления) и дедлайном управляет пайплайн, поэтому замеры времени честные.
  */
 export const llm = new OpenAI({
   baseURL: config.llmBaseUrl,
@@ -39,7 +39,7 @@ export async function chatJson<T>(opts: ChatOpts & { schemaName: string; schema:
   return JSON.parse(text) as T;
 }
 
-/** Streams a completion, reporting accumulated length; returns the full text. */
+/** Стримит ответ, сообщая накопленную длину; возвращает весь текст. */
 export async function chatStream(opts: ChatOpts & { onChars: (n: number) => void }): Promise<string> {
   const stream = await llm.chat.completions.create(
     {

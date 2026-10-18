@@ -13,10 +13,10 @@ export interface KitConfig {
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
-/** Keep inline script content from closing its own <script> element. */
+/** Не даёт встроенному коду закрыть собственный тег <script>. */
 const scriptSafe = (s: string) => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
 
-/** Assemble a self-contained game document: runtime + config + generated game code. */
+/** Собирает самодостаточный документ игры: рантайм + конфиг + сгенерированный код. */
 export function assembleGame(config: KitConfig, gameCode: string, lang = "ru"): string {
   return `<!doctype html>
 <html lang="${escapeHtml(lang)}">

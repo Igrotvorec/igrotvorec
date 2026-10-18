@@ -25,7 +25,7 @@ export interface GameDetail extends GameSummary {
   history: GameVersion[];
 }
 
-/** Server-sent events emitted while a game is generated, edited or repaired. */
+/** SSE-события во время генерации, правки или исправления игры. */
 export type GenEvent =
   | { type: "stage"; stage: "spec" | "code" | "check" | "save"; message: string }
   | { type: "spec"; spec: GameSpec }

@@ -16,7 +16,7 @@ export interface OpState {
 
 const idle: OpState = { running: false, stage: null, message: "", chars: 0, spec: null, error: null, startedAt: 0 };
 
-/** Drives one generate/edit/repair SSE operation and exposes its live progress. */
+/** Ведёт одну SSE-операцию (генерация, правка, исправление) и отдаёт её текущий прогресс. */
 export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) => void) {
   const [state, setState] = useState<OpState>(idle);
   const abortRef = useRef<AbortController | null>(null);

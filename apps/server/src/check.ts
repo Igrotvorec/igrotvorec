@@ -1,6 +1,6 @@
 import * as acorn from "acorn";
 
-/** Pull JS out of an LLM reply that may wrap it in markdown fences or add prose. */
+/** Достаёт JS из ответа LLM, даже если он обёрнут в markdown-блок или окружён текстом. */
 export function extractCode(reply: string): string {
   const fenced = [...reply.matchAll(/```(?:js|javascript)?\s*\n([\s\S]*?)```/gi)].map((m) => m[1] ?? "");
   if (fenced.length) return fenced.sort((a, b) => b.length - a.length)[0]!.trim();
@@ -25,7 +25,7 @@ export interface CheckResult {
   errors: string[];
 }
 
-/** Static checks only: syntax, size, forbidden APIs, required runtime hooks. Never executes the code. */
+/** Только статические проверки: синтаксис, размер, запрещённые API, обязательные хуки. Код не исполняется. */
 export function checkGameCode(code: string): CheckResult {
   const errors: string[] = [];
   if (code.length < 200) errors.push("Code is too short to be a game");

@@ -67,7 +67,7 @@ export function createGame(prompt: string): string {
   return id;
 }
 
-/** Writes the HTML artifact first, then records the version row; the URL only exists once both are done. */
+/** Сначала пишет HTML на диск, потом строку версии: ссылка появляется, только когда готово и то и другое. */
 export async function addVersion(v: {
   gameId: string;
   spec: GameSpec;

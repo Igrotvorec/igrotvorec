@@ -1,7 +1,7 @@
 /*
- * GG runtime: fixed library inlined into every generated game.
- * Owns canvas scaling, input, game states (start/playing/won/lost), overlays, sound, storage
- * via the shell, and self-diagnostics. Generated code only writes game logic against `kit`.
+ * Рантайм GG: фиксированная библиотека, встроенная в каждую сгенерированную игру.
+ * Отвечает за масштабирование канваса, ввод, состояния (start/playing/won/lost), экраны, звук,
+ * хранилище через оболочку и самодиагностику. Сгенерированный код пишет только логику игры через `kit`.
  */
 (function () {
   "use strict";
@@ -23,7 +23,7 @@
   var errorShown = false;
   var reported = {};
   var reportCount = 0;
-  /** Each distinct error is reported once, at most 5 per page load. */
+  /** Каждая уникальная ошибка отправляется один раз, не больше 5 за загрузку страницы. */
   function postError(msg) {
     var key = msg.message + "|" + (msg.line || "");
     if (reported[key] || reportCount >= 5) return;
@@ -59,7 +59,7 @@
 
   post({ type: "boot" });
 
-  // ---------- storage (owned by the shell; sandboxed iframe has no usable localStorage) ----------
+  // ---------- хранилище (у оболочки; в sandbox-iframe localStorage недоступен) ----------
   var reqSeq = 0;
   var pending = {};
   window.addEventListener("message", function (e) {
@@ -98,7 +98,7 @@
     },
   };
 
-  // ---------- canvas & scaling ----------
+  // ---------- канвас и масштабирование ----------
   var canvas, ctx, dpr, scale, offX, offY;
 
   function resize() {
@@ -124,7 +124,7 @@
     return { x: (clientX - offX) / scale, y: (clientY - offY) / scale };
   }
 
-  // ---------- sound (WebAudio synth, starts after first gesture) ----------
+  // ---------- звук (синтез WebAudio, включается после первого жеста) ----------
   var audio = null;
   var muted = false;
   function ensureAudio() {
@@ -169,7 +169,7 @@
     lose: function () { [392, 330, 262].forEach(function (f, i) { setTimeout(function () { tone(f, 0.25, "sawtooth", 0.1); }, i * 150); }); },
   };
 
-  // ---------- particles ----------
+  // ---------- частицы ----------
   var parts = [];
   function particles(x, y, color, count) {
     count = Math.min(count || 12, 60);
@@ -181,7 +181,7 @@
     if (parts.length > 400) parts.splice(0, parts.length - 400);
   }
 
-  // ---------- state ----------
+  // ---------- состояние ----------
   var handlers = { start: [], update: [], render: [], tap: [], down: [], move: [], up: [], swipe: [], key: [] };
   var state = "start";
   var smoking = false;
@@ -218,7 +218,7 @@
   }
 
   var overlayShownAt = 0;
-  /** Result screens ignore input briefly so a frantic tap does not skip the score. */
+  /** Экран результата ненадолго игнорирует ввод, чтобы случайный тап не пропустил счёт. */
   function overlayClickable() {
     return performance.now() - overlayShownAt > 700;
   }
@@ -307,7 +307,7 @@
     } catch (e) {}
   }
 
-  // ---------- main loop ----------
+  // ---------- главный цикл ----------
   var frameReported = false;
   function frame(ts) {
     requestAnimationFrame(frame);
@@ -359,7 +359,7 @@
     ctx.restore();
   }
 
-  /** True when the render pass drew something other than a flat background. */
+  /** true, если отрисовка нарисовала что-то кроме однотонного фона. */
   function checkPainted() {
     try {
       var w = canvas.width;
@@ -376,10 +376,10 @@
     }
   }
 
-  // ---------- input ----------
+  // ---------- ввод ----------
   var pointer = { x: 0, y: 0, down: false };
   var keys = {};
-  /** Active gestures by pointerId, so multi-touch never mixes up taps and swipes. */
+  /** Активные жесты по pointerId, чтобы мультитач не путал тапы и свайпы. */
   var gestures = {};
   var SWIPE_PX = 30;
   var inputReported = false;
@@ -427,7 +427,7 @@
       if (state !== "playing" || paused) return;
       call(handlers.move, [p.x, p.y, e.pointerId], "onPointerMove");
       var g = gestures[e.pointerId];
-      // Fire the swipe as soon as the finger travels far enough: slow swipes count too.
+      // Свайп срабатывает, как только палец сместился достаточно далеко: медленные свайпы тоже считаются.
       if (g && !g.swiped) {
         var dx = p.x - g.x;
         var dy = p.y - g.y;
@@ -461,7 +461,7 @@
       ensureAudio();
       markInput();
       if (state !== "playing") {
-        // Ignore auto-repeat so a held key does not skip the result screen.
+        // Автоповтор игнорируем, чтобы зажатая клавиша не пропускала экран результата.
         if (!e.repeat && (k === "space" || k === "enter") && overlayClickable()) startRound();
         return;
       }
@@ -491,7 +491,7 @@
     });
   }
 
-  // ---------- smoke test: exercise callbacks before the player starts ----------
+  // ---------- smoke-тест: прогоняем колбэки до того, как игрок начнёт ----------
   function smoke() {
     smoking = true;
     var ok = resetRound();
@@ -513,7 +513,7 @@
     return ok;
   }
 
-  // ---------- public API ----------
+  // ---------- публичный API ----------
   var kit = {
     W: W,
     H: H,
@@ -576,7 +576,7 @@
       if (fill) { ctx.fillStyle = fill; ctx.fill(); }
       if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
     },
-    // Generated code sometimes assigns these; accept it instead of throwing.
+    // Сгенерированный код иногда присваивает эти поля — принимаем значение, а не падаем.
     get palette() { return cfg.palette; },
     set palette(v) { if (v && typeof v === "object") for (var k in v) if (typeof v[k] === "string") cfg.palette[k] = v[k]; },
     get uiScale() { return cfg.uiScale; },
