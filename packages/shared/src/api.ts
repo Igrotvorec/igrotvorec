@@ -15,6 +15,7 @@ export interface GameSummary {
   title: string;
   audience: GameSpec["audience"];
   genre: GameSpec["genre"];
+  palette: GameSpec["palette"];
   latestVersionId: string;
   versions: number;
   createdAt: number;

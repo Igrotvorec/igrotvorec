@@ -487,6 +487,7 @@
     get score() { return score; },
     set score(v) { score = Math.max(0, Math.floor(Number(v) || 0)); },
     get best() { return best; },
+    set best(v) {},
     pointer: pointer,
     keys: keys,
     storage: storage,
@@ -539,9 +540,13 @@
       if (fill) { ctx.fillStyle = fill; ctx.fill(); }
       if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
     },
+    // Generated code sometimes assigns these; accept it instead of throwing.
     get palette() { return cfg.palette; },
+    set palette(v) { if (v && typeof v === "object") for (var k in v) if (typeof v[k] === "string") cfg.palette[k] = v[k]; },
     get uiScale() { return cfg.uiScale; },
+    set uiScale(v) { if (v > 0) cfg.uiScale = Number(v); },
     get speed() { return cfg.speed; },
+    set speed(v) { if (v > 0) cfg.speed = Number(v); },
   };
 
   window.GG = {

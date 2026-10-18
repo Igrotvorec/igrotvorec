@@ -90,6 +90,8 @@ app.post("/api/repair", async (c) => {
 
 app.get("/api/games", (c) => c.json(listGames()));
 
+app.get("/api/config", (c) => c.json({ publicUrl: config.publicUrl }));
+
 app.get("/api/games/:id", (c) => {
   const g = getGame(c.req.param("id"));
   return g ? c.json(g) : c.json({ error: "not found" }, 404);

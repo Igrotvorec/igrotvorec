@@ -2,13 +2,16 @@
   "name": "beeline-gamegen",
   "private": true,
   "type": "module",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun run --filter '*' dev",
     "dev:server": "bun run --filter @gg/server dev",
     "dev:web": "bun run --filter @gg/web dev",
     "build": "bun run --filter @gg/web build",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -p packages/shared && tsc -p packages/runtime && tsc -p apps/server && tsc -p apps/web"
   },
   "devDependencies": {
     "@types/bun": "^1.4.3",

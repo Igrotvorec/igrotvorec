@@ -7,8 +7,6 @@
  */
 import puppeteer from "puppeteer-core";
 
-const [gameId, outDir = "./data/shots", base = "http://localhost:8787"] = process.argv.slice(2);
-if (!gameId) throw new Error("usage: bun tools/try-game.ts <gameId> [outDir] [baseUrl]");
 
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
@@ -61,6 +59,8 @@ export async function tryGame(id: string, dir: string, baseUrl: string) {
 }
 
 if (import.meta.main) {
+  const [gameId, outDir = "./data/shots", base = "http://localhost:8787"] = process.argv.slice(2);
+  if (!gameId) throw new Error("usage: bun tools/try-game.ts <gameId> [outDir] [baseUrl]");
   await Bun.$`mkdir -p ${outDir}`;
   console.log(JSON.stringify(await tryGame(gameId, outDir, base), null, 2));
 }

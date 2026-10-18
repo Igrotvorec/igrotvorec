@@ -51,6 +51,7 @@ Config: kit.palette = { background, primary, accent, text }, kit.uiScale (1 = no
 Storage (optional): kit.storage.get(key) → Promise<string|null>, kit.storage.set(key, string)
 
 Hard rules:
+- Never assign to kit properties other than kit.score (read kit.palette, kit.uiScale, kit.speed; do not overwrite them).
 - Plain ES2019 JavaScript in the global scope. Wrap your code in an IIFE: (function () { ... })();
 - Self-contained: no fetch/XHR/WebSocket, no external URLs, no images/fonts from the network, no import, no eval, no localStorage/sessionStorage/cookies, no alert/prompt/confirm, no DOM manipulation (draw everything on the canvas). Graphics are drawn with canvas primitives, gradients, paths and emoji text.
 - Do not create your own requestAnimationFrame/setInterval game loop; use kit.onUpdate. setTimeout only for short cosmetic effects.
