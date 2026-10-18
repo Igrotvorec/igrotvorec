@@ -23,6 +23,7 @@ export async function chatJson<T>(opts: ChatOpts & { schemaName: string; schema:
   const res = await llm.chat.completions.create(
     {
       model: opts.model,
+      ...(config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {}),
       messages: [
         { role: "system", content: opts.system },
         { role: "user", content: opts.user },
@@ -45,6 +46,7 @@ export async function chatStream(opts: ChatOpts & { onChars: (n: number) => void
     {
       model: opts.model,
       stream: true,
+      ...(config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {}),
       messages: [
         { role: "system", content: opts.system },
         { role: "user", content: opts.user },

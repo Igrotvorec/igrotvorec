@@ -207,7 +207,7 @@
 
   function setState(s) {
     state = s;
-    post({ type: "state", state: s, score: score });
+    post({ type: "state", state: s, score: score, activeMs: Math.round(time * 1000) });
   }
 
   function el(tag, cls, text) {

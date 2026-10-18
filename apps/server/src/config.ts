@@ -9,6 +9,8 @@ export const config = {
   llmApiKey: required("LLM_API_KEY"),
   specModel: process.env.SPEC_MODEL ?? "gpt-6.1-sol",
   codeModel: process.env.CODE_MODEL ?? "gpt-6.1-sol",
+  /** service_tier для запросов к LLM; "priority" включает fast-режим Sol. Пусто — не передаём. */
+  serviceTier: process.env.LLM_SERVICE_TIER || undefined,
   port: Number(process.env.PORT ?? 8787),
   dataDir: process.env.DATA_DIR ?? "./data",
   publicUrl: process.env.PUBLIC_URL ?? "http://localhost:5173",

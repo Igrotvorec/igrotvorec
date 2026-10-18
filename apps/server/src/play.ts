@@ -23,7 +23,6 @@ export function playShell(opts: { title: string; versionId: string; background: 
   var session = runId;
   var frame = document.getElementById("game");
   var storeKey = function (k) { return "gg:" + location.pathname + ":" + k; };
-  var roundStart = 0;
   var errorSent = false;
   function send(type, extra) {
     var body = JSON.stringify(Object.assign({ versionId: cfg.versionId, session: session, type: type }, extra || {}));
@@ -40,8 +39,9 @@ export function playShell(opts: { title: string; versionId: string; background: 
     } else if (m.type === "storage:set" && typeof m.key === "string" && m.key.length < 64 && typeof m.value === "string" && m.value.length <= 2048) {
       try { localStorage.setItem(storeKey(m.key), m.value); } catch (err) {}
     } else if (m.type === "state") {
-      if (m.state === "playing") { roundStart = Date.now(); send("round_start"); }
-      else if (m.state === "won" || m.state === "lost") send(m.state, { score: Number(m.score) || 0, playMs: roundStart ? Date.now() - roundStart : 0 });
+      if (m.state === "playing") send("round_start");
+      // Время раунда без пауз считает рантайм; ограничиваем, чтобы событие не отбросила схема сервера.
+      else if (m.state === "won" || m.state === "lost") send(m.state, { score: Math.min(Math.max(Math.floor(Number(m.score) || 0), 0), 1e9), playMs: Math.min(Math.max(Math.round(Number(m.activeMs) || 0), 0), 3600000) });
     } else if (m.type === "error" && !errorSent) {
       errorSent = true;
       send("error");

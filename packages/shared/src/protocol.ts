@@ -10,7 +10,7 @@ export type GameToShell =
   | { gg: 1; runId: string; type: "frame"; painted: boolean }
   | { gg: 1; runId: string; type: "input" }
   | { gg: 1; runId: string; type: "error"; message: string; stack?: string; line?: number; col?: number }
-  | { gg: 1; runId: string; type: "state"; state: "start" | "playing" | "won" | "lost"; score?: number }
+  | { gg: 1; runId: string; type: "state"; state: "start" | "playing" | "won" | "lost"; score?: number; activeMs?: number }
   | { gg: 1; runId: string; type: "storage:get"; reqId: number; key: string }
   | { gg: 1; runId: string; type: "storage:set"; key: string; value: string };
 
