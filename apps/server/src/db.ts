@@ -5,6 +5,7 @@ import type { GameDetail, GameSpec, GameSummary, GameVersion, VersionKind } from
 import { config } from "./config";
 
 mkdirSync(join(config.dataDir, "games"), { recursive: true });
+mkdirSync(join(config.dataDir, "thumbs"), { recursive: true });
 
 const db = new Database(join(config.dataDir, "gamegen.sqlite"), { create: true, strict: true });
 db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
@@ -48,12 +49,16 @@ if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some(
 if (!(db.query("PRAGMA table_info(games)").all() as { name: string }[]).some((c) => c.name === "listed")) {
   db.exec("ALTER TABLE games ADD COLUMN listed INTEGER NOT NULL DEFAULT 1");
 }
+if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some((c) => c.name === "has_thumb")) {
+  db.exec("ALTER TABLE versions ADD COLUMN has_thumb INTEGER NOT NULL DEFAULT 0");
+}
 // Версия 1 — всегда создание игры, даже если старая миграция приняла её за исправление по тексту.
 db.exec("UPDATE versions SET kind = 'create' WHERE version = 1 AND kind != 'create'");
 
 const shortId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 10);
 
 export const gamePath = (versionId: string) => join(config.dataDir, "games", `${versionId}.html`);
+export const thumbPath = (versionId: string) => join(config.dataDir, "thumbs", `${versionId}.webp`);
 
 interface VersionRow {
   id: string;
@@ -64,6 +69,7 @@ interface VersionRow {
   instruction: string;
   kind: VersionKind;
   assets: string;
+  has_thumb: number;
   created_at: number;
 }
 
@@ -75,6 +81,7 @@ const toVersion = (r: VersionRow): GameVersion => ({
   spec: JSON.parse(r.spec) as GameSpec,
   instruction: r.instruction,
   createdAt: r.created_at,
+  hasThumb: r.has_thumb === 1,
 });
 
 /** listed=false — игра доступна по ссылке, но не показывается в галерее (тестовые прогоны). */
@@ -143,6 +150,7 @@ export function getGame(id: string): GameDetail | null {
     genre: latest.spec.genre,
     palette: latest.spec.palette,
     latestVersionId: latest.id,
+    thumbVersionId: [...history].reverse().find((v) => v.hasThumb)?.id ?? null,
     hasCover: Object.keys(JSON.parse((db.query("SELECT assets FROM versions WHERE id = ?").get(latest.id) as { assets: string }).assets || "{}")).length > 0,
     versions: history.length,
     createdAt: g.created_at,
@@ -153,12 +161,13 @@ export function getGame(id: string): GameDetail | null {
 export function listGames(limit = 60): GameSummary[] {
   const rows = db
     .query(
-      `SELECT g.id, g.prompt, g.created_at, v.id AS vid, v.spec, v.version, v.assets != '{}' AS has_cover
+      `SELECT g.id, g.prompt, g.created_at, v.id AS vid, v.spec, v.version, v.assets != '{}' AS has_cover,
+              (SELECT t.id FROM versions t WHERE t.game_id = g.id AND t.has_thumb = 1 ORDER BY t.version DESC LIMIT 1) AS thumb_vid
        FROM games g JOIN versions v ON v.game_id = g.id
        WHERE g.listed = 1 AND v.version = (SELECT MAX(version) FROM versions WHERE game_id = g.id)
        ORDER BY g.created_at DESC LIMIT ?`,
     )
-    .all(limit) as { id: string; prompt: string; created_at: number; vid: string; spec: string; version: number; has_cover: number }[];
+    .all(limit) as { id: string; prompt: string; created_at: number; vid: string; spec: string; version: number; has_cover: number; thumb_vid: string | null }[];
   return rows.map((r) => {
     const spec = JSON.parse(r.spec) as GameSpec;
     return {
@@ -170,10 +179,20 @@ export function listGames(limit = 60): GameSummary[] {
       palette: spec.palette,
       latestVersionId: r.vid,
       hasCover: r.has_cover === 1,
+      thumbVersionId: r.thumb_vid,
       versions: r.version,
       createdAt: r.created_at,
     };
   });
+}
+
+/** Снимок пишется один раз: первый открывший версию (обычно автор в превью) задаёт обложку. */
+export async function saveThumb(versionId: string, webp: Buffer): Promise<boolean> {
+  const row = db.query("SELECT has_thumb FROM versions WHERE id = ?").get(versionId) as { has_thumb: number } | null;
+  if (!row || row.has_thumb) return false;
+  await Bun.write(thumbPath(versionId), webp);
+  db.query("UPDATE versions SET has_thumb = 1 WHERE id = ?").run(versionId);
+  return true;
 }
 
 export function addEvent(e: { versionId: string; session: string; type: string; score?: number; playMs?: number }) {

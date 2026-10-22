@@ -10,6 +10,8 @@ export interface GameVersion {
   spec: GameSpec;
   instruction: string;
   createdAt: number;
+  /** Есть снимок стартовой сцены (/thumb/:id). */
+  hasThumb: boolean;
 }
 
 export interface GameSummary {
@@ -21,6 +23,8 @@ export interface GameSummary {
   palette: GameSpec["palette"];
   latestVersionId: string;
   hasCover: boolean;
+  /** Самая новая версия со снимком: после правки снимок появится, когда новую версию откроют. */
+  thumbVersionId: string | null;
   versions: number;
   createdAt: number;
 }
@@ -51,4 +55,20 @@ export interface SegmentStatsDto {
   replaySessions: number;
   avgRoundSec: number | null;
   errorSessions: number;
+}
+
+/** Метрики /play: по игре целиком или по одной версии. */
+export interface PlayStats {
+  sessions: number;
+  rounds: number;
+  finished: number;
+  wins: number;
+  replaySessions: number;
+  avgRoundSec: number | null;
+  errorSessions: number;
+}
+
+export interface GameStatsDto {
+  total: PlayStats;
+  versions: ({ versionId: string; version: number } & PlayStats)[];
 }

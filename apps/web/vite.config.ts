@@ -7,6 +7,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    proxy: { "/api": api, "^/g/": api, "^/play/": api, "^/cover/": api },
+    proxy: { "/api": api, "^/g/": api, "^/play/": api, "^/cover/": api, "^/thumb/": api },
   },
 });

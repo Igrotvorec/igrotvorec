@@ -12,7 +12,8 @@ export type GameToShell =
   | { gg: 1; runId: string; type: "error"; message: string; stack?: string; line?: number; col?: number }
   | { gg: 1; runId: string; type: "state"; state: "start" | "playing" | "won" | "lost"; score?: number; activeMs?: number }
   | { gg: 1; runId: string; type: "storage:get"; reqId: number; key: string }
-  | { gg: 1; runId: string; type: "storage:set"; key: string; value: string };
+  | { gg: 1; runId: string; type: "storage:set"; key: string; value: string }
+  | { gg: 1; runId: string; type: "thumb"; image: string };
 
 export type ShellToGame =
   | { gg: 1; type: "storage:value"; reqId: number; value: string | null }
@@ -20,8 +21,11 @@ export type ShellToGame =
   | { gg: 1; type: "resume" };
 
 export const MAX_STORAGE_VALUE = 2048;
+/** Снимок стартовой сцены 270×480 JPEG; с запасом, сервер всё равно перекодирует. */
+export const MAX_THUMB_CHARS = 300_000;
+const THUMB_PREFIX = "data:image/jpeg;base64,";
 
-const GAME_TYPES = new Set(["boot", "ready", "frame", "input", "error", "state", "storage:get", "storage:set"]);
+const GAME_TYPES = new Set(["boot", "ready", "frame", "input", "error", "state", "storage:get", "storage:set", "thumb"]);
 
 /** Проверяет форму недоверенного сообщения от игры и обрезает поля до безопасной длины. */
 export function parseGameMessage(data: unknown, runId: string): GameToShell | null {
@@ -56,6 +60,10 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
     case "storage:set": {
       if (typeof m.key !== "string" || m.key.length > 64 || typeof m.value !== "string" || m.value.length > MAX_STORAGE_VALUE) return null;
       return { gg: 1, runId, type: "storage:set", key: m.key, value: m.value };
+    }
+    case "thumb": {
+      if (typeof m.image !== "string" || m.image.length > MAX_THUMB_CHARS || !m.image.startsWith(THUMB_PREFIX)) return null;
+      return { gg: 1, runId, type: "thumb", image: m.image };
     }
   }
   return null;

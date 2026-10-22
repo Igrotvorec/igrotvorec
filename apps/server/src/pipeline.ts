@@ -16,7 +16,7 @@ type Emit = (e: GenEvent) => void;
 /** Отказ по содержанию запроса: показывается пользователю как есть. */
 export class RefusalError extends Error {}
 
-function kitConfig(spec: GameSpec, assets: SpriteMap): KitConfig {
+export function kitConfig(spec: GameSpec, assets: SpriteMap): KitConfig {
   const p = AUDIENCE_PROFILES[spec.audience];
   return {
     title: spec.title,

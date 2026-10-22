@@ -4,10 +4,12 @@ import { serveStatic } from "hono/bun";
 import { z } from "zod";
 import type { GenEvent } from "@gg/shared";
 import { config } from "./config";
-import { addEvent, gamePath, getGame, getVersion, listGames } from "./db";
+import sharp from "sharp";
+import { MAX_THUMB_CHARS } from "@gg/shared";
+import { addEvent, gamePath, getGame, getVersion, listGames, saveThumb, thumbPath } from "./db";
 import { edit, generate, repair } from "./pipeline";
 import { playShell } from "./play";
-import { MIN_SESSIONS, segmentStats } from "./stats";
+import { MIN_SESSIONS, gameStats, segmentStats } from "./stats";
 import { spriteBytes } from "./assets";
 
 const app = new Hono();
@@ -120,6 +122,44 @@ app.get("/api/games/:id", (c) => {
   return g ? c.json(g) : c.json({ error: "not found" }, 404);
 });
 
+app.get("/api/games/:id/stats", (c) => {
+  const id = c.req.param("id");
+  return getGame(id) ? c.json(gameStats(id)) : c.json({ error: "not found" }, 404);
+});
+
+app.get("/api/versions/:id/code", (c) => {
+  const v = getVersion(c.req.param("id"));
+  return v ? c.json({ code: v.code }) : c.json({ error: "not found" }, 404);
+});
+
+const ThumbBody = z.object({ image: z.string().max(MAX_THUMB_CHARS).startsWith("data:image/jpeg;base64,") });
+
+/**
+ * Снимок стартовой сцены от превью. Картинка пришла из недоверенного iframe, поэтому
+ * сервер декодирует и перекодирует её сам: наружу отдаётся только наш WebP фиксированного размера.
+ */
+app.post("/api/thumbs/:versionId", async (c) => {
+  const body = ThumbBody.safeParse(await c.req.json().catch(() => null));
+  const id = c.req.param("versionId");
+  if (!body.success || !/^[a-f0-9]{10}$/.test(id)) return c.body(null, 400);
+  try {
+    const src = Buffer.from(body.data.image.slice("data:image/jpeg;base64,".length), "base64");
+    const webp = await sharp(src, { limitInputPixels: 1_000_000 }).resize(270, 480, { fit: "cover" }).webp({ quality: 78 }).toBuffer();
+    await saveThumb(id, webp);
+  } catch {
+    return c.body(null, 400);
+  }
+  return c.body(null, 204);
+});
+
+app.get("/thumb/:versionId", async (c) => {
+  const id = c.req.param("versionId");
+  if (!/^[a-f0-9]{10}$/.test(id)) return c.notFound();
+  const file = Bun.file(thumbPath(id));
+  if (!(await file.exists())) return c.notFound();
+  return c.body(await file.arrayBuffer(), 200, { "content-type": "image/webp", "cache-control": "public, max-age=31536000, immutable" });
+});
+
 app.post("/api/events", async (c) => {
   const body = EventBody.safeParse(await c.req.json().catch(() => null));
   if (!body.success || !getVersion(body.data.versionId)) return c.body(null, 204);
@@ -139,7 +179,8 @@ app.get("/g/:versionId", async (c) => {
     "content-type": "text/html; charset=utf-8",
     "content-security-policy": GAME_CSP,
     "x-content-type-options": "nosniff",
-    "cache-control": "public, max-age=31536000, immutable",
+    // Короткий кэш: HTML версии может пересобираться с новым рантаймом (tools/reassemble.ts).
+    "cache-control": "public, max-age=600",
   });
 });
 

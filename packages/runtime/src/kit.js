@@ -534,6 +534,18 @@
     });
   }
 
+  // ---------- снимок для галереи: кадр стартовой сцены без оверлея (он в DOM, а не на канвасе) ----------
+  function postThumb() {
+    if (errorShown || !hasParent) return;
+    try {
+      var c = document.createElement("canvas");
+      c.width = 270;
+      c.height = 480;
+      c.getContext("2d").drawImage(canvas, offX * dpr, offY * dpr, W * scale * dpr, H * scale * dpr, 0, 0, 270, 480);
+      post({ type: "thumb", image: c.toDataURL("image/jpeg", 0.82) });
+    } catch (e) {}
+  }
+
   // ---------- smoke-тест: прогоняем колбэки до того, как игрок начнёт ----------
   function smoke() {
     smoking = true;
@@ -666,7 +678,10 @@
       });
       showOverlay("start");
       requestAnimationFrame(frame);
-      if (ok) post({ type: "ready" });
+      if (ok) {
+        post({ type: "ready" });
+        setTimeout(postThumb, 1200);
+      }
     },
   };
 })();
