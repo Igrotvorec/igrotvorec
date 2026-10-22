@@ -6,8 +6,9 @@ import type { GenEvent } from "@gg/shared";
 import { config } from "./config";
 import sharp from "sharp";
 import { MAX_THUMB_CHARS } from "@gg/shared";
-import { addEvent, gamePath, getGame, getVersion, listGames, needsThumb, recoverThumbClaims, saveThumb, thumbPath } from "./db";
+import { addEvent, getGame, getVersion, listGames, needsThumb, recoverThumbClaims, saveThumb, thumbPath } from "./db";
 import { thumbTokenValid } from "./thumbs";
+import { currentHtml } from "./html";
 import { bodyLimit } from "hono/body-limit";
 import { RUNTIME_VERSION } from "@gg/runtime";
 import { RefusalError, edit, generate, repair } from "./pipeline";
@@ -196,13 +197,14 @@ app.post("/api/events", async (c) => {
 app.get("/g/:versionId", async (c) => {
   const id = c.req.param("versionId");
   if (!/^[a-f0-9]{10}$/.test(id)) return c.notFound();
-  const file = Bun.file(gamePath(id));
-  if (!(await file.exists())) return c.notFound();
-  return c.body(await file.text(), 200, {
+  const html = await currentHtml(id);
+  if (html === null) return c.notFound();
+  return c.body(html, 200, {
     "content-type": "text/html; charset=utf-8",
     "content-security-policy": GAME_CSP,
     "x-content-type-options": "nosniff",
-    // Адрес с текущей версией рантайма неизменен; без неё (старые ссылки) — короткий кэш.
+    // HTML всегда собран текущим рантаймом (currentHtml), поэтому адрес с его версией неизменен;
+    // без версии (старые ссылки) — короткий кэш.
     "cache-control": c.req.query("r") === RUNTIME_VERSION ? "public, max-age=31536000, immutable" : "public, max-age=600",
   });
 });

@@ -84,7 +84,9 @@ export function GameFrame({
         const t = thumbRef.current;
         if (failed || !t.thumbToken || t.sent) return;
         t.sent = true;
-        postThumb(versionId, m.image, t.thumbToken).then(() => t.onThumb?.());
+        postThumb(versionId, m.image, t.thumbToken).then((ok) => {
+          if (ok) t.onThumb?.();
+        });
       } else if (m.type === "storage:get") {
         let value: string | null = null;
         try {

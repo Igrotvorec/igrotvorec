@@ -54,6 +54,7 @@ export function GameView({ id }: { id: string }) {
       return getGame(id).then(
         (g) => {
           if (seq !== loadSeq.current) return;
+          setLoadError(null);
           setGame(g);
           if (selectLatest) setSelected(g.latestVersionId);
         },
@@ -80,7 +81,9 @@ export function GameView({ id }: { id: string }) {
     if (game) repairedRef.current.add(game.latestVersionId);
     setInstruction("");
     setTab("play");
-    load(true);
+    // Новую версию выбираем сразу по id из done: более поздний фоновый refresh не вернёт старую.
+    setSelected(e.versionId);
+    load(false);
   });
   const repairing = op.running && opKind === "repair";
 

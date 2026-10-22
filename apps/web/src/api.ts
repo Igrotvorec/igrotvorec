@@ -13,8 +13,27 @@ export const getGame = (id: string) => fetch(`/api/games/${id}`).then((r) => jso
 export const getStats = () => fetch("/api/stats").then((r) => json<{ minSessions: number; segments: SegmentStatsDto[] }>(r));
 export const getGameStats = (id: string) => fetch(`/api/games/${id}/stats`).then((r) => json<GameStatsDto>(r));
 export const getCode = (versionId: string) => fetch(`/api/versions/${versionId}/code`).then((r) => json<{ code: string }>(r));
-export const postThumb = (versionId: string, image: string, token: string) =>
-  fetch(`/api/thumbs/${versionId}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image, token }) }).catch(() => {});
+/**
+ * Отправляет снимок. Рантайм присылает кадр один раз за запуск, поэтому временные отказы
+ * (503 — сервер занят перекодированием, сетевая ошибка) повторяем с тем же кадром. true — сервер принял.
+ */
+export async function postThumb(versionId: string, image: string, token: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 1500 * attempt));
+    try {
+      const res = await fetch(`/api/thumbs/${versionId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image, token }),
+      });
+      if (res.ok) return true;
+      if (res.status !== 503) return false;
+    } catch {
+      /* сеть — пробуем ещё раз */
+    }
+  }
+  return false;
+}
 let configPromise: Promise<{ publicUrl: string; runtimeVersion: string }> | null = null;
 /** Конфиг не меняется за время жизни страницы: запрашиваем один раз, при ошибке пробуем снова. */
 export const getConfig = () =>
