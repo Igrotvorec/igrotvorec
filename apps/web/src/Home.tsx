@@ -19,7 +19,7 @@ export function Home() {
   const [genre, setGenre] = useState<Genre | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Если пока шла генерация пользователь ушёл смотреть другую игру, не выдёргиваем его оттуда.
-  const { state: op, run, cancel } = useOperation((e) => {
+  const { state: op, run, cancel, reset } = useOperation((e) => {
     if (location.pathname === "/") navigate(`/games/${e.gameId}`);
   });
   useAutosize(inputRef, prompt);
@@ -49,8 +49,18 @@ export function Home() {
 
   return (
     <main className="page">
-      {op.running ? (
-        <Build prompt={submitted} op={op} onCancel={cancel} />
+      {/* Сбой сборки остаётся на экране сборки с упавшим шагом; отказ модели возвращает к запросу. */}
+      {op.running || (op.error && !op.refusal && op.marks.length > 0) ? (
+        <Build
+          prompt={submitted}
+          op={op}
+          onCancel={cancel}
+          onRetry={() => run("/api/generate", { prompt: submitted })}
+          onEdit={() => {
+            reset();
+            setTimeout(() => inputRef.current?.focus());
+          }}
+        />
       ) : (
         <section className="hero">
           <div>

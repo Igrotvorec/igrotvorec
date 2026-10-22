@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckIcon as Check } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon as ArrowClockwise, CheckIcon as Check, XIcon as X } from "@phosphor-icons/react";
 import { AUDIENCE_LABEL, GENRE_LABEL } from "./labels";
 import { Phone } from "./Phone";
 import type { OpState, Stage } from "./useOperation";
@@ -23,29 +23,51 @@ function useNow(active: boolean) {
   return now;
 }
 
-/** Шаги пайплайна с длительностями. Этап может повториться (исправление кода), считаем по последнему входу. */
+/** Отрезки времени по этапам: этап может повторяться (самоисправление кода), время складывается. */
+function segments(op: OpState, now: number) {
+  return op.marks.map((m, i) => ({ ...m, end: op.marks[i + 1]?.at ?? (op.running ? now : op.finishedAt || m.at) }));
+}
+
+const STANDARD_SPEC_MESSAGES = new Set(["Разбираю запрос", "Обновляю описание игры"]);
+
+/** Шаги пайплайна с длительностями; при сбое текущий шаг отмечается как упавший. */
 export function Steps({ op }: { op: OpState }) {
   const now = useNow(op.running);
+  const segs = segments(op, now);
   const current = STEPS.findIndex((s) => s.stage === op.stage);
+  const failed = !op.running && !!op.error;
   return (
     <ol className="steps">
       {STEPS.map((s, i) => {
-        const marks = op.marks.filter((m) => m.stage === s.stage);
-        const first = marks[0];
-        const next = op.marks.find((m) => first && m.at > first.at && STEPS.findIndex((x) => x.stage === m.stage) > i);
-        const state = i < current ? "done" : i === current ? "active" : "";
-        let detail = marks.at(-1)?.message ?? s.idle;
-        if (s.stage === "code" && op.chars > 0) detail = `${(op.chars / 1000).toFixed(1)} тыс. символов`;
-        if (s.stage === "spec" && state === "done" && op.spec) detail = op.spec.title;
-        const ms = first ? Math.max(0, (next ? next.at : state === "active" ? now : first.at) - first.at) : 0;
+        const own = segs.filter((g) => g.stage === s.stage);
+        const state = i < current ? "done" : i === current ? (failed ? "failed" : "active") : "";
+        const ms = own.reduce((sum, g) => sum + Math.max(0, g.end - g.at), 0);
+        let detail = s.idle;
+        if (state) {
+          detail = own.at(-1)?.message ?? s.idle;
+          if (s.stage === "code") {
+            const retry = own.length > 1;
+            const chars = op.chars > 0 ? `${(op.chars / 1000).toFixed(1)} тыс. символов` : "";
+            detail = [retry ? "Исправляю найденные ошибки" : state === "done" ? "" : "Пишу код игры", chars].filter(Boolean).join(" · ");
+            if (!detail) detail = s.idle;
+          }
+          if (s.stage === "spec" && op.spec) {
+            // Сообщение о статистике — единственное видимое свидетельство, что аналитика влияет на генерацию.
+            const extra = own.map((g) => g.message).find((m) => !STANDARD_SPEC_MESSAGES.has(m));
+            detail = extra ? `${op.spec.title} · ${extra.charAt(0).toLowerCase()}${extra.slice(1)}` : op.spec.title;
+          }
+        }
         return (
           <li key={s.stage} className={`step ${state}`}>
-            <span className="step-icon">{state === "done" && <Check size={13} weight="bold" />}</span>
+            <span className="step-icon">
+              {state === "done" && <Check size={13} weight="bold" />}
+              {state === "failed" && <X size={13} weight="bold" />}
+            </span>
             <div>
               <div className="step-label">{s.label}</div>
               <div className="step-detail">{detail}</div>
             </div>
-            <span className="step-time">{first && state ? sec(ms) : ""}</span>
+            <span className="step-time">{state && own.length ? sec(ms) : ""}</span>
           </li>
         );
       })}
@@ -59,7 +81,20 @@ export function Elapsed({ op }: { op: OpState }) {
 }
 
 /** Экран генерации новой игры: шаги, спецификация по мере готовности и заготовка экрана в цветах игры. */
-export function Build({ prompt, op, onCancel }: { prompt: string; op: OpState; onCancel: () => void }) {
+export function Build({
+  prompt,
+  op,
+  onCancel,
+  onRetry,
+  onEdit,
+}: {
+  prompt: string;
+  op: OpState;
+  onCancel: () => void;
+  onRetry: () => void;
+  onEdit: () => void;
+}) {
+  const failed = !op.running && !!op.error;
   const spec = op.spec;
   const palette = spec?.palette;
   return (
@@ -68,17 +103,35 @@ export function Build({ prompt, op, onCancel }: { prompt: string; op: OpState; o
         {op.message}
       </p>
       <div>
-        <h1>Собираем игру</h1>
+        <h1>{failed ? "Игра не собралась" : "Собираем игру"}</h1>
         <p className="build-prompt">{prompt}</p>
         <Steps op={op} />
-        <div className="build-foot">
-          <span className="muted">
-            Прошло <Elapsed op={op} />
-          </span>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>
-            Отменить
-          </button>
-        </div>
+        {failed ? (
+          <div className="build-fail" role="alert">
+            <p>Не получилось собрать игру. Попробуйте ещё раз или переформулируйте запрос.</p>
+            <details>
+              <summary>Подробности</summary>
+              <code>{op.error}</code>
+            </details>
+            <div className="build-foot">
+              <button type="button" className="btn btn-primary btn-sm" onClick={onRetry}>
+                <ArrowClockwise size={16} aria-hidden /> Повторить
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={onEdit}>
+                Изменить запрос
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="build-foot">
+            <span className="muted">
+              Прошло <Elapsed op={op} />
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>
+              Отменить
+            </button>
+          </div>
+        )}
         {spec && (
           <div className="spec-card">
             <div>

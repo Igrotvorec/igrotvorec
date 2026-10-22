@@ -22,9 +22,11 @@ export interface OpState {
   /** Ошибка — осознанный отказ модели, а не сбой: показывается спокойнее. */
   refusal: boolean;
   startedAt: number;
+  /** Когда операция закончилась (успехом или ошибкой): конец последнего шага. */
+  finishedAt: number;
 }
 
-const idle: OpState = { running: false, stage: null, message: "", marks: [], chars: 0, spec: null, error: null, refusal: false, startedAt: 0 };
+const idle: OpState = { running: false, stage: null, message: "", marks: [], chars: 0, spec: null, error: null, refusal: false, startedAt: 0, finishedAt: 0 };
 
 /** Ведёт одну SSE-операцию (генерация, правка, исправление) и отдаёт её текущий прогресс. */
 export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) => void) {
@@ -45,15 +47,22 @@ export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) =>
         body,
         (e) => {
           if (e.type === "stage")
-            setState((s) => ({ ...s, stage: e.stage, message: e.message, marks: [...s.marks, { stage: e.stage, message: e.message, at: Date.now() }] }));
+            setState((s) => ({
+              ...s,
+              stage: e.stage,
+              message: e.message,
+              // Новый заход в «код» (самоисправление) считает символы заново.
+              chars: e.stage === "code" ? 0 : s.chars,
+              marks: [...s.marks, { stage: e.stage, message: e.message, at: Date.now() }],
+            }));
           else if (e.type === "progress") setState((s) => ({ ...s, chars: e.chars }));
           else if (e.type === "spec") setState((s) => ({ ...s, spec: e.spec }));
           else if (e.type === "error") {
             finished = true;
-            setState((s) => ({ ...s, running: false, error: e.message, refusal: e.kind === "refusal" }));
+            setState((s) => ({ ...s, running: false, error: e.message, refusal: e.kind === "refusal", finishedAt: Date.now() }));
           } else if (e.type === "done") {
             finished = true;
-            setState((s) => ({ ...s, running: false }));
+            setState((s) => ({ ...s, running: false, finishedAt: Date.now() }));
             doneRef.current(e);
           }
         },
