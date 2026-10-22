@@ -6,7 +6,10 @@ import type { GenEvent } from "@gg/shared";
 import { config } from "./config";
 import sharp from "sharp";
 import { MAX_THUMB_CHARS } from "@gg/shared";
-import { addEvent, gamePath, getGame, getVersion, listGames, saveThumb, thumbPath } from "./db";
+import { addEvent, gamePath, getGame, getVersion, listGames, needsThumb, saveThumb, thumbPath } from "./db";
+import { thumbTokenValid } from "./thumbs";
+import { bodyLimit } from "hono/body-limit";
+import { RUNTIME_VERSION } from "@gg/runtime";
 import { RefusalError, edit, generate, repair } from "./pipeline";
 import { playShell } from "./play";
 import { MIN_SESSIONS, gameStats, segmentStats } from "./stats";
@@ -115,7 +118,7 @@ app.get("/api/games", (c) => c.json(listGames()));
 
 app.get("/api/stats", (c) => c.json({ minSessions: MIN_SESSIONS, segments: segmentStats() }));
 
-app.get("/api/config", (c) => c.json({ publicUrl: config.publicUrl }));
+app.get("/api/config", (c) => c.json({ publicUrl: config.publicUrl, runtimeVersion: RUNTIME_VERSION }));
 
 app.get("/api/games/:id", (c) => {
   const g = getGame(c.req.param("id"));
@@ -132,25 +135,45 @@ app.get("/api/versions/:id/code", (c) => {
   return v ? c.json({ code: v.code }) : c.json({ error: "not found" }, 404);
 });
 
-const ThumbBody = z.object({ image: z.string().max(MAX_THUMB_CHARS).startsWith("data:image/jpeg;base64,") });
+const ThumbBody = z.strictObject({
+  image: z.string().max(MAX_THUMB_CHARS).startsWith("data:image/jpeg;base64,"),
+  token: z.string().max(64),
+});
+/** Перекодирование картинок — нативная работа sharp; держим не больше двух одновременно. */
+let thumbJobs = 0;
 
 /**
- * Снимок стартовой сцены от превью. Картинка пришла из недоверенного iframe, поэтому
- * сервер декодирует и перекодирует её сам: наружу отдаётся только наш WebP фиксированного размера.
+ * Снимок стартовой сцены от превью автора. Порядок проверок дешёвый → дорогой: размер тела до
+ * разбора JSON, токен автора, нужен ли ещё снимок, и только потом декодирование. Картинка пришла
+ * из недоверенного iframe, поэтому сервер перекодирует её сам и отдаёт только свой WebP.
  */
-app.post("/api/thumbs/:versionId", async (c) => {
-  const body = ThumbBody.safeParse(await c.req.json().catch(() => null));
-  const id = c.req.param("versionId");
-  if (!body.success || !/^[a-f0-9]{10}$/.test(id)) return c.body(null, 400);
-  try {
-    const src = Buffer.from(body.data.image.slice("data:image/jpeg;base64,".length), "base64");
-    const webp = await sharp(src, { limitInputPixels: 1_000_000 }).resize(270, 480, { fit: "cover" }).webp({ quality: 78 }).toBuffer();
-    await saveThumb(id, webp);
-  } catch {
-    return c.body(null, 400);
-  }
-  return c.body(null, 204);
-});
+app.post(
+  "/api/thumbs/:versionId",
+  bodyLimit({ maxSize: MAX_THUMB_CHARS + 512, onError: (c) => c.body(null, 413) }),
+  async (c) => {
+    const id = c.req.param("versionId");
+    const body = ThumbBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success || !/^[a-f0-9]{10}$/.test(id)) return c.body(null, 400);
+    if (!thumbTokenValid(id, body.data.token)) return c.body(null, 403);
+    if (!needsThumb(id)) return c.body(null, 204);
+    if (thumbJobs >= 2) return c.body(null, 503);
+    thumbJobs++;
+    try {
+      const src = Buffer.from(body.data.image.slice("data:image/jpeg;base64,".length), "base64");
+      await saveThumb(id, async () => {
+        const img = sharp(src, { limitInputPixels: 1_000_000 });
+        // Принимаем только настоящий JPEG, а не любой формат под видом data:image/jpeg.
+        if ((await img.metadata()).format !== "jpeg") throw new Error("not a jpeg");
+        return img.resize(270, 480, { fit: "cover" }).webp({ quality: 78 }).toBuffer();
+      });
+    } catch {
+      return c.body(null, 400);
+    } finally {
+      thumbJobs--;
+    }
+    return c.body(null, 204);
+  },
+);
 
 app.get("/thumb/:versionId", async (c) => {
   const id = c.req.param("versionId");
@@ -179,8 +202,8 @@ app.get("/g/:versionId", async (c) => {
     "content-type": "text/html; charset=utf-8",
     "content-security-policy": GAME_CSP,
     "x-content-type-options": "nosniff",
-    // Короткий кэш: HTML версии может пересобираться с новым рантаймом (tools/reassemble.ts).
-    "cache-control": "public, max-age=600",
+    // Адрес с текущей версией рантайма неизменен; без неё (старые ссылки) — короткий кэш.
+    "cache-control": c.req.query("r") === RUNTIME_VERSION ? "public, max-age=31536000, immutable" : "public, max-age=600",
   });
 });
 

@@ -1,6 +1,9 @@
 const kitJs = await Bun.file(new URL("./kit.js", import.meta.url)).text();
 const kitCss = await Bun.file(new URL("./kit.css", import.meta.url)).text();
 
+/** Хэш рантайма: входит в URL /g/:id?r=…, поэтому после пересборки браузер не держит старый HTML из кэша. */
+export const RUNTIME_VERSION = Bun.hash(kitJs + kitCss).toString(36).slice(0, 8);
+
 export interface KitConfig {
   title: string;
   instructions: string;

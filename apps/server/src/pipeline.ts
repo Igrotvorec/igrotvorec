@@ -1,5 +1,6 @@
 import { AUDIENCE_PROFILES, GameSpecSchema, HEX_COLOR, specResponseJsonSchema, type GameSpec, type GenEvent, type VersionKind } from "@gg/shared";
 import { assembleGame, type KitConfig } from "@gg/runtime";
+import { thumbToken } from "./thumbs";
 import { config } from "./config";
 import { checkGameCode, extractCode } from "./check";
 import { chatJson, chatStream } from "./llm";
@@ -115,7 +116,7 @@ async function save(
   emit({ type: "stage", stage: "save", message: "Публикую игру" });
   const html = assembleGame(kitConfig(v.spec, v.assets), v.code, v.spec.language);
   const saved = await addVersion({ ...v, html, model: config.codeModel, genMs: Date.now() - v.started });
-  emit({ type: "done", gameId: v.gameId, versionId: saved.id, version: saved.version });
+  emit({ type: "done", gameId: v.gameId, versionId: saved.id, version: saved.version, thumbToken: thumbToken(saved.id) });
 }
 
 async function waitSprites(pending: Promise<SpriteMap>, emit: Emit): Promise<SpriteMap> {

@@ -38,7 +38,8 @@ export type GenEvent =
   | { type: "stage"; stage: "spec" | "code" | "check" | "save"; message: string }
   | { type: "spec"; spec: GameSpec }
   | { type: "progress"; chars: number }
-  | { type: "done"; gameId: string; versionId: string; version: number }
+  /** thumbToken — право загрузить обложку новой версии; получает только автор. */
+  | { type: "done"; gameId: string; versionId: string; version: number; thumbToken: string }
   /** kind "refusal" — осознанный отказ модели (вредный или не игровой запрос), а не сбой. */
   | { type: "error"; message: string; kind?: "refusal" }
   | { type: "ping" };

@@ -10,7 +10,15 @@ export function CodeView({ version }: { version: GameVersion }) {
   useEffect(() => {
     setCode(null);
     setError(null);
-    getCode(version.id).then((r) => setCode(r.code), (e: Error) => setError(e.message));
+    // Ответ по прошлой версии, пришедший позже, не должен подменить код текущей.
+    let current = true;
+    getCode(version.id).then(
+      (r) => current && setCode(r.code),
+      (e: Error) => current && setError(e.message),
+    );
+    return () => {
+      current = false;
+    };
   }, [version.id]);
   // sugar-high экранирует исходник и возвращает разметку только из своих span-ов.
   const html = useMemo(() => (code ? highlight(code) : ""), [code]);

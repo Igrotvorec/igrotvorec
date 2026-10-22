@@ -13,9 +13,17 @@ export const getGame = (id: string) => fetch(`/api/games/${id}`).then((r) => jso
 export const getStats = () => fetch("/api/stats").then((r) => json<{ minSessions: number; segments: SegmentStatsDto[] }>(r));
 export const getGameStats = (id: string) => fetch(`/api/games/${id}/stats`).then((r) => json<GameStatsDto>(r));
 export const getCode = (versionId: string) => fetch(`/api/versions/${versionId}/code`).then((r) => json<{ code: string }>(r));
-export const postThumb = (versionId: string, image: string) =>
-  fetch(`/api/thumbs/${versionId}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image }) }).catch(() => {});
-export const getConfig = () => fetch("/api/config").then((r) => json<{ publicUrl: string }>(r));
+export const postThumb = (versionId: string, image: string, token: string) =>
+  fetch(`/api/thumbs/${versionId}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image, token }) }).catch(() => {});
+let configPromise: Promise<{ publicUrl: string; runtimeVersion: string }> | null = null;
+/** Конфиг не меняется за время жизни страницы: запрашиваем один раз, при ошибке пробуем снова. */
+export const getConfig = () =>
+  (configPromise ??= fetch("/api/config")
+    .then((r) => json<{ publicUrl: string; runtimeVersion: string }>(r))
+    .catch((e) => {
+      configPromise = null;
+      throw e;
+    }));
 
 /** Делает POST и читает SSE-ответ, вызывая onEvent на каждое событие. Завершается вместе с потоком. */
 export async function streamOp(url: string, body: unknown, onEvent: (e: GenEvent) => void, signal?: AbortSignal) {

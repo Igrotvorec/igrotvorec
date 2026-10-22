@@ -16,6 +16,7 @@ import { Art } from "./Art";
 import { Elapsed, Steps } from "./Build";
 import { ErrorNote } from "./ErrorNote";
 import { useAutosize } from "./useAutosize";
+import { rememberThumbToken, thumbTokenFor } from "./thumbTokens";
 import { CodeView } from "./CodeView";
 import { GameAnalytics } from "./GameAnalytics";
 import { GameFrame, type FrameStatus } from "./GameFrame";
@@ -45,15 +46,22 @@ export function GameView({ id }: { id: string }) {
   const editRef = useRef<HTMLTextAreaElement>(null);
   useAutosize(editRef, instruction);
 
+  // Ответы могут прийти не по порядку (обновление после снимка и после правки): применяем только самый свежий запрос.
+  const loadSeq = useRef(0);
   const load = useCallback(
-    (selectLatest: boolean) =>
-      getGame(id).then(
+    (selectLatest: boolean) => {
+      const seq = ++loadSeq.current;
+      return getGame(id).then(
         (g) => {
+          if (seq !== loadSeq.current) return;
           setGame(g);
           if (selectLatest) setSelected(g.latestVersionId);
         },
-        (e: Error) => setLoadError(e.message),
-      ),
+        (e: Error) => {
+          if (seq === loadSeq.current) setLoadError(e.message);
+        },
+      );
+    },
     [id],
   );
   useEffect(() => {
@@ -66,7 +74,8 @@ export function GameView({ id }: { id: string }) {
     listGames().then(setGames, () => {});
   }, [game?.latestVersionId]);
 
-  const { state: op, run, cancel } = useOperation(() => {
+  const { state: op, run, cancel } = useOperation((e) => {
+    rememberThumbToken(e.versionId, e.thumbToken);
     // Бывшая последняя версия заменена новой — автоисправлять её уже не нужно.
     if (game) repairedRef.current.add(game.latestVersionId);
     setInstruction("");
@@ -163,7 +172,7 @@ export function GameView({ id }: { id: string }) {
                     versionId={version.id}
                     reloadKey={reloadKey}
                     onStatus={setStatus}
-                    needThumb={!version.hasThumb}
+                    thumbToken={version.hasThumb ? null : thumbTokenFor(version.id)}
                     onThumb={() => load(false)}
                   />
                 </Phone>
@@ -216,7 +225,7 @@ export function GameView({ id }: { id: string }) {
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   submitEdit(instruction);
                 }

@@ -6,6 +6,7 @@ import { Art } from "./Art";
 import { Build } from "./Build";
 import { ErrorNote } from "./ErrorNote";
 import { useAutosize } from "./useAutosize";
+import { rememberThumbToken } from "./thumbTokens";
 import { AUDIENCE_LABEL, GENRE_LABEL, PROMPT_EXAMPLES } from "./labels";
 import { Phone } from "./Phone";
 import { useOperation } from "./useOperation";
@@ -20,6 +21,7 @@ export function Home() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Если пока шла генерация пользователь ушёл смотреть другую игру, не выдёргиваем его оттуда.
   const { state: op, run, cancel, reset } = useOperation((e) => {
+    rememberThumbToken(e.versionId, e.thumbToken);
     if (location.pathname === "/") navigate(`/games/${e.gameId}`);
   });
   useAutosize(inputRef, prompt);
@@ -87,7 +89,8 @@ export function Home() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  // Enter, подтверждающий слово в IME, не отправляет запрос.
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     submit(prompt);
                   }

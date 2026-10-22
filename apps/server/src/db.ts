@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import type { GameDetail, GameSpec, GameSummary, GameVersion, VersionKind } from "@gg/shared";
 import { config } from "./config";
@@ -52,6 +52,8 @@ if (!(db.query("PRAGMA table_info(games)").all() as { name: string }[]).some((c)
 if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some((c) => c.name === "has_thumb")) {
   db.exec("ALTER TABLE versions ADD COLUMN has_thumb INTEGER NOT NULL DEFAULT 0");
 }
+// has_thumb: 0 — нет, 2 — идёт запись, 1 — готово. Незавершённые записи после падения сбрасываем.
+db.exec("UPDATE versions SET has_thumb = 0 WHERE has_thumb = 2");
 // Версия 1 — всегда создание игры, даже если старая миграция приняла её за исправление по тексту.
 db.exec("UPDATE versions SET kind = 'create' WHERE version = 1 AND kind != 'create'");
 
@@ -186,13 +188,31 @@ export function listGames(limit = 60): GameSummary[] {
   });
 }
 
-/** Снимок пишется один раз: первый открывший версию (обычно автор в превью) задаёт обложку. */
-export async function saveThumb(versionId: string, webp: Buffer): Promise<boolean> {
+/** Версии ещё нужен снимок (дешёвая проверка до декодирования картинки). */
+export function needsThumb(versionId: string): boolean {
   const row = db.query("SELECT has_thumb FROM versions WHERE id = ?").get(versionId) as { has_thumb: number } | null;
-  if (!row || row.has_thumb) return false;
-  await Bun.write(thumbPath(versionId), webp);
-  db.query("UPDATE versions SET has_thumb = 1 WHERE id = ?").run(versionId);
-  return true;
+  return row?.has_thumb === 0;
+}
+
+/**
+ * Снимок пишется один раз. Сначала атомарно резервируем версию (0 → 2), поэтому второй
+ * параллельный запрос ничего не запишет; файл кладётся через временный и rename.
+ */
+export async function saveThumb(versionId: string, makeWebp: () => Promise<Buffer>): Promise<boolean> {
+  const claimed = db.query("UPDATE versions SET has_thumb = 2 WHERE id = ? AND has_thumb = 0").run(versionId).changes === 1;
+  if (!claimed) return false;
+  const path = thumbPath(versionId);
+  const tmp = `${path}.${process.pid}.tmp`;
+  try {
+    await Bun.write(tmp, await makeWebp());
+    renameSync(tmp, path);
+    db.query("UPDATE versions SET has_thumb = 1 WHERE id = ?").run(versionId);
+    return true;
+  } catch (e) {
+    db.query("UPDATE versions SET has_thumb = 0 WHERE id = ? AND has_thumb = 2").run(versionId);
+    await Bun.file(tmp).delete().catch(() => {});
+    throw e;
+  }
 }
 
 export function addEvent(e: { versionId: string; session: string; type: string; score?: number; playMs?: number }) {

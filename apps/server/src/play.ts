@@ -1,10 +1,11 @@
+import { RUNTIME_VERSION } from "@gg/runtime";
 /**
  * Доверенная оболочка /play: полноэкранная страница, которая держит игру в sandbox-iframe,
  * владеет хранилищем (у игры с opaque origin нет localStorage) и отправляет телеметрию.
  */
 export function playShell(opts: { title: string; versionId: string; background: string }): string {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-  const data = JSON.stringify({ versionId: opts.versionId }).replace(/</g, "\\u003c");
+  const data = JSON.stringify({ versionId: opts.versionId, runtime: RUNTIME_VERSION }).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="ru">
 <head>
@@ -65,7 +66,7 @@ export function playShell(opts: { title: string; versionId: string; background: 
     if (document.hidden && frame.contentWindow) frame.contentWindow.postMessage({ gg: 1, type: "pause" }, "*");
   });
   send("open");
-  frame.src = "/g/" + encodeURIComponent(cfg.versionId) + "#run=" + runId;
+  frame.src = "/g/" + encodeURIComponent(cfg.versionId) + "?r=" + encodeURIComponent(cfg.runtime) + "#run=" + runId;
 })();
 </script>
 </body>

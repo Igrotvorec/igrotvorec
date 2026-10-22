@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { STORAGE_MAX_BYTES, STORAGE_MAX_KEYS, parseGameMessage } from "@gg/shared";
-import { postThumb } from "./api";
+import { getConfig, postThumb } from "./api";
 
 /** Каждый статус помнит свою версию, поэтому устаревший статус не применится к другой. */
 export type FrameStatus = { versionId: string } & (
@@ -35,26 +35,33 @@ export function GameFrame({
   versionId,
   reloadKey,
   onStatus,
-  needThumb = false,
+  thumbToken = null,
   onThumb,
 }: {
   gameId: string;
   versionId: string;
   reloadKey: number;
   onStatus: (s: FrameStatus) => void;
-  /** У версии ещё нет снимка: первый кадр без ошибок отправляется на сервер как обложка. */
-  needThumb?: boolean;
+  /** Есть у автора, пока у версии нет снимка: первый кадр без ошибок уходит на сервер как обложка. */
+  thumbToken?: string | null;
   onThumb?: () => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const runId = useMemo(() => Math.random().toString(36).slice(2, 12), [versionId, reloadKey]);
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
-  const thumbRef = useRef({ needThumb, onThumb });
-  thumbRef.current = { needThumb, onThumb };
+  const thumbRef = useRef({ thumbToken, onThumb, sent: false });
+  thumbRef.current.thumbToken = thumbToken;
+  thumbRef.current.onThumb = onThumb;
+  // Версия рантайма в адресе /g: после пересборки браузер не возьмёт старый HTML из кэша.
+  const [runtime, setRuntime] = useState<string | null>(null);
+  useEffect(() => {
+    getConfig().then((c) => setRuntime(c.runtimeVersion), () => setRuntime(""));
+  }, []);
 
   useEffect(() => {
     statusRef.current({ versionId, kind: "loading" });
+    thumbRef.current.sent = false;
     let booted = false;
     let failed = false;
     const timer = setTimeout(() => {
@@ -74,9 +81,10 @@ export function GameFrame({
         const where = m.line ? ` (строка ${m.line}${m.col ? ":" + m.col : ""})` : "";
         statusRef.current({ versionId, kind: "error", message: `${m.message}${where}${m.stack ? "\n" + m.stack : ""}` });
       } else if (m.type === "thumb") {
-        if (failed || !thumbRef.current.needThumb) return;
-        thumbRef.current.needThumb = false;
-        postThumb(versionId, m.image).then(() => thumbRef.current.onThumb?.());
+        const t = thumbRef.current;
+        if (failed || !t.thumbToken || t.sent) return;
+        t.sent = true;
+        postThumb(versionId, m.image, t.thumbToken).then(() => t.onThumb?.());
       } else if (m.type === "storage:get") {
         let value: string | null = null;
         try {
@@ -101,6 +109,7 @@ export function GameFrame({
     };
   }, [gameId, versionId, runId]);
 
+  if (runtime === null) return null;
   return (
     <iframe
       key={runId}
@@ -108,7 +117,7 @@ export function GameFrame({
             title="Игра"
       sandbox="allow-scripts"
       allow="autoplay; vibrate"
-      src={`/g/${versionId}#run=${runId}`}
+      src={`/g/${versionId}${runtime ? `?r=${runtime}` : ""}#run=${runId}`}
     />
   );
 }
