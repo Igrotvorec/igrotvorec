@@ -52,8 +52,6 @@ if (!(db.query("PRAGMA table_info(games)").all() as { name: string }[]).some((c)
 if (!(db.query("PRAGMA table_info(versions)").all() as { name: string }[]).some((c) => c.name === "has_thumb")) {
   db.exec("ALTER TABLE versions ADD COLUMN has_thumb INTEGER NOT NULL DEFAULT 0");
 }
-// has_thumb: 0 — нет, 2 — идёт запись, 1 — готово. Незавершённые записи после падения сбрасываем.
-db.exec("UPDATE versions SET has_thumb = 0 WHERE has_thumb = 2");
 // Версия 1 — всегда создание игры, даже если старая миграция приняла её за исправление по тексту.
 db.exec("UPDATE versions SET kind = 'create' WHERE version = 1 AND kind != 'create'");
 
@@ -186,6 +184,15 @@ export function listGames(limit = 60): GameSummary[] {
       createdAt: r.created_at,
     };
   });
+}
+
+/**
+ * has_thumb: 0 — нет, 2 — идёт запись, 1 — готово. Сброс незавершённых записей после падения
+ * вызывает только сам сервер при старте: CLI-инструменты импортируют этот модуль при живом сервере
+ * и не должны снимать его резервы.
+ */
+export function recoverThumbClaims() {
+  db.exec("UPDATE versions SET has_thumb = 0 WHERE has_thumb = 2");
 }
 
 /** Версии ещё нужен снимок (дешёвая проверка до декодирования картинки). */

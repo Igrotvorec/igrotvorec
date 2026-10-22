@@ -6,7 +6,7 @@ import type { GenEvent } from "@gg/shared";
 import { config } from "./config";
 import sharp from "sharp";
 import { MAX_THUMB_CHARS } from "@gg/shared";
-import { addEvent, gamePath, getGame, getVersion, listGames, needsThumb, saveThumb, thumbPath } from "./db";
+import { addEvent, gamePath, getGame, getVersion, listGames, needsThumb, recoverThumbClaims, saveThumb, thumbPath } from "./db";
 import { thumbTokenValid } from "./thumbs";
 import { bodyLimit } from "hono/body-limit";
 import { RUNTIME_VERSION } from "@gg/runtime";
@@ -236,5 +236,6 @@ app.get("*", async (c, next) => {
   return (await spaIndex(c, next)) ?? c.notFound();
 });
 
+recoverThumbClaims();
 Bun.serve({ port: config.port, fetch: app.fetch, idleTimeout: 30 });
 console.log(`server on :${config.port}`);
