@@ -48,9 +48,12 @@ export function Steps({ op }: { op: OpState }) {
           if (s.stage === "code") {
             const retry = own.length > 1;
             const chars = op.chars > 0 ? `${(op.chars / 1000).toFixed(1)} тыс. символов` : "";
-            detail = [retry ? "Исправляю найденные ошибки" : state === "done" ? "" : "Пишу код игры", chars].filter(Boolean).join(" · ");
+            const what =
+              state === "failed" ? (retry ? "Исправить не удалось" : "Код не дописан") : retry ? "Исправляю найденные ошибки" : state === "done" ? "" : "Пишу код игры";
+            detail = [what, chars].filter(Boolean).join(" · ");
             if (!detail) detail = s.idle;
           }
+          if (state === "failed" && s.stage !== "code") detail = `Остановлено: ${detail.charAt(0).toLowerCase()}${detail.slice(1)}`;
           if (s.stage === "spec" && op.spec) {
             // Сообщение о статистике — единственное видимое свидетельство, что аналитика влияет на генерацию.
             const extra = own.map((g) => g.message).find((m) => !STANDARD_SPEC_MESSAGES.has(m));
@@ -159,7 +162,7 @@ export function Build({
             {spec.sprites && spec.sprites.length > 0 && (
               <div>
                 {/* Описания спрайтов — английский промпт для модели картинок, в интерфейсе только значки. */}
-                <div className="field-label">Спрайты рисуются параллельно с кодом</div>
+                <div className="field-label">{failed ? "Спрайты" : "Спрайты рисуются параллельно с кодом"}</div>
                 <div className="sprite-row" aria-hidden>
                   {spec.sprites.map((s) => (
                     <span key={s.key}>{s.fallback}</span>
