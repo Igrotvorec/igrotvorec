@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SegmentStatsDto } from "@gg/shared";
 import { getStats } from "./api";
-import { AUDIENCE_LABEL, GENRE_LABEL } from "./labels";
-
-const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
+import { AUDIENCE_LABEL, GENRE_LABEL, pct } from "./labels";
 
 export function Stats() {
   const [data, setData] = useState<{ minSessions: number; segments: SegmentStatsDto[] } | null>(null);
@@ -11,45 +9,53 @@ export function Stats() {
   useEffect(() => {
     getStats().then(setData, (e: Error) => setError(e.message));
   }, []);
+  const segments = data ? [...data.segments].sort((a, b) => b.sessions - a.sessions) : [];
 
   return (
-    <main className="stats">
-      <h1>Статистика игр</h1>
-      <p className="muted">
-        Сегменты с {data?.minSessions ?? "…"}+ сессиями учитываются при генерации новых игр.
+    <main className="page stats-page">
+      <h1>Аналитика</h1>
+      <p className="lead">
+        Сыгранные раунды по аудиториям и жанрам. Сегменты, где набралось от {data?.minSessions ?? "…"} сессий, учитываются при генерации новых игр.
       </p>
-      {error && <p className="error">{error}</p>}
-      {data && data.segments.length === 0 && <p className="muted">Пока нет сыгранных раундов</p>}
-      {data && data.segments.length > 0 && (
+      {error && <p className="alert alert-err">{error}</p>}
+      {!data && !error && <div className="skeleton" style={{ height: 240 }} />}
+      {data && segments.length === 0 && <p className="empty">Пока никто не играл. Откройте любую игру по ссылке или QR-коду.</p>}
+      {segments.length > 0 && (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Аудитория</th>
                 <th>Жанр</th>
-                <th>Игр</th>
-                <th>Сессий</th>
-                <th>Раундов</th>
-                <th>Побед</th>
-                <th>Повторы</th>
-                <th>Средний раунд</th>
-                <th>Ошибки</th>
+                <th className="r">Игры</th>
+                <th className="r">Сессии</th>
+                <th className="r">Раунды</th>
+                <th className="r">Победы</th>
+                <th className="r">Повторы</th>
+                <th className="r">Средний раунд</th>
+                <th className="r">Ошибки</th>
               </tr>
             </thead>
             <tbody>
-              {data.segments.map((s) => (
-                <tr key={`${s.audience}-${s.genre}`} className={s.sessions >= data.minSessions ? "" : "dim"}>
-                  <td>{AUDIENCE_LABEL[s.audience]}</td>
-                  <td>{GENRE_LABEL[s.genre]}</td>
-                  <td>{s.games}</td>
-                  <td>{s.sessions}</td>
-                  <td>{s.rounds}</td>
-                  <td>{pct(s.wins, s.finished)}</td>
-                  <td>{pct(s.replaySessions, s.sessions)}</td>
-                  <td>{s.avgRoundSec != null ? `${s.avgRoundSec} с` : "—"}</td>
-                  <td>{s.errorSessions}</td>
-                </tr>
-              ))}
+              {segments.map((s) => {
+                const low = s.sessions < data!.minSessions;
+                return (
+                  <tr key={`${s.audience}-${s.genre}`} className={low ? "dim" : ""}>
+                    <td>
+                      {AUDIENCE_LABEL[s.audience]}
+                      {low && <span className="low">мало данных</span>}
+                    </td>
+                    <td>{GENRE_LABEL[s.genre]}</td>
+                    <td className="r">{s.games}</td>
+                    <td className="r">{s.sessions}</td>
+                    <td className="r">{s.rounds}</td>
+                    <td className="r">{pct(s.wins, s.finished)}</td>
+                    <td className="r">{pct(s.replaySessions, s.sessions)}</td>
+                    <td className="r">{s.avgRoundSec != null ? `${s.avgRoundSec} с` : "—"}</td>
+                    <td className="r">{s.errorSessions}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

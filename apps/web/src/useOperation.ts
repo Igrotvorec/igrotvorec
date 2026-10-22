@@ -4,17 +4,25 @@ import { streamOp } from "./api";
 
 export type Stage = "spec" | "code" | "check" | "save";
 
+/** Отметка смены этапа: по соседним отметкам считается длительность шага. */
+export interface StageMark {
+  stage: Stage;
+  message: string;
+  at: number;
+}
+
 export interface OpState {
   running: boolean;
   stage: Stage | null;
   message: string;
+  marks: StageMark[];
   chars: number;
   spec: GameSpec | null;
   error: string | null;
   startedAt: number;
 }
 
-const idle: OpState = { running: false, stage: null, message: "", chars: 0, spec: null, error: null, startedAt: 0 };
+const idle: OpState = { running: false, stage: null, message: "", marks: [], chars: 0, spec: null, error: null, startedAt: 0 };
 
 /** Ведёт одну SSE-операцию (генерация, правка, исправление) и отдаёт её текущий прогресс. */
 export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) => void) {
@@ -34,7 +42,8 @@ export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) =>
         url,
         body,
         (e) => {
-          if (e.type === "stage") setState((s) => ({ ...s, stage: e.stage, message: e.message }));
+          if (e.type === "stage")
+            setState((s) => ({ ...s, stage: e.stage, message: e.message, marks: [...s.marks, { stage: e.stage, message: e.message, at: Date.now() }] }));
           else if (e.type === "progress") setState((s) => ({ ...s, chars: e.chars }));
           else if (e.type === "spec") setState((s) => ({ ...s, spec: e.spec }));
           else if (e.type === "error") {
@@ -60,5 +69,7 @@ export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) =>
     setState(idle);
   }, []);
 
-  return { state, run, cancel };
+  const reset = useCallback(() => setState(idle), []);
+
+  return { state, run, cancel, reset };
 }

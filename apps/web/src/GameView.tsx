@@ -1,19 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import type { GameDetail } from "@gg/shared";
-import { getConfig, getGame } from "./api";
+import {
+  ArrowLeftIcon as ArrowLeft,
+  ArrowSquareOutIcon as ArrowSquareOut,
+  ArrowClockwiseIcon as ArrowClockwise,
+  ChartBarIcon as ChartBar,
+  CodeIcon as Code,
+  CopyIcon as Copy,
+  CheckIcon as Check,
+  PlayIcon as Play,
+  PlusIcon as Plus,
+} from "@phosphor-icons/react";
+import type { GameDetail, GameSummary, GameVersion } from "@gg/shared";
+import { getConfig, getGame, listGames } from "./api";
+import { Art } from "./Art";
+import { Elapsed, Steps } from "./Build";
+import { CodeView } from "./CodeView";
+import { GameAnalytics } from "./GameAnalytics";
 import { GameFrame, type FrameStatus } from "./GameFrame";
-import { AUDIENCE_LABEL, EDIT_EXAMPLES, GENRE_LABEL } from "./labels";
-import { Progress } from "./Progress";
+import { AUDIENCE_LABEL, EDIT_EXAMPLES, GENRE_LABEL, timeAgo } from "./labels";
+import { Phone } from "./Phone";
 import { useOperation } from "./useOperation";
-import { navigate } from "./router";
+import { Link } from "./router";
+
+type Tab = "play" | "code" | "stats";
 
 export function GameView({ id }: { id: string }) {
   const [game, setGame] = useState<GameDetail | null>(null);
+  const [games, setGames] = useState<GameSummary[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<FrameStatus | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [tab, setTab] = useState<Tab>("play");
   const [instruction, setInstruction] = useState("");
   const [opKind, setOpKind] = useState<"edit" | "repair">("edit");
   const repairedRef = useRef(new Set<string>());
@@ -31,13 +50,19 @@ export function GameView({ id }: { id: string }) {
   );
   useEffect(() => {
     setGame(null);
+    setLoadError(null);
+    setTab("play");
     load(true);
   }, [load]);
+  useEffect(() => {
+    listGames().then(setGames, () => {});
+  }, [game?.latestVersionId]);
 
   const { state: op, run, cancel } = useOperation(() => {
     // Бывшая последняя версия заменена новой — автоисправлять её уже не нужно.
     if (game) repairedRef.current.add(game.latestVersionId);
     setInstruction("");
+    setTab("play");
     load(true);
   });
   const repairing = op.running && opKind === "repair";
@@ -54,8 +79,24 @@ export function GameView({ id }: { id: string }) {
     run("/api/repair", { versionId: version.id, error: status.message });
   }, [status, version, isLatest, op.running, run]);
 
-  if (loadError) return <main className="game-view"><p className="error">{loadError}</p></main>;
-  if (!game || !version) return <main className="game-view"><p className="muted">Загрузка…</p></main>;
+  if (loadError)
+    return (
+      <main className="page">
+        <p className="alert alert-err" style={{ marginTop: 32 }}>
+          {loadError === "not found" ? "Игра не найдена" : loadError}
+        </p>
+      </main>
+    );
+  if (!game || !version)
+    return (
+      <main className="workspace">
+        <aside className="side" />
+        <div className="stage-col">
+          <div className="stage-card skeleton" />
+        </div>
+        <aside className="panel" />
+      </main>
+    );
 
   const submitEdit = (text: string) => {
     const t = text.trim();
@@ -63,45 +104,124 @@ export function GameView({ id }: { id: string }) {
     setOpKind("edit");
     run(`/api/games/${game.id}/edit`, { instruction: t });
   };
+  const playUrl = `/play/${game.id}${isLatest ? "" : `?v=${version.version}`}`;
 
   return (
-    <main className="game-view">
-      <section className="game-side">
-        <button type="button" className="btn-ghost back" onClick={() => navigate("/")}>
-          ← Все игры
-        </button>
-        <h1>{version.spec.title}</h1>
-        <div className="tags">
-          <span>{GENRE_LABEL[version.spec.genre]}</span>
-          <span>{AUDIENCE_LABEL[version.spec.audience]}</span>
-          <span>v{version.version}</span>
+    <main className="workspace">
+      <aside className="side" aria-label="Игры">
+        <Link to="/" className="btn btn-quiet side-back">
+          <ArrowLeft size={16} aria-hidden /> Все игры
+        </Link>
+        <nav className="side-list">
+          {games.map((g) => (
+            <Link key={g.id} to={`/games/${g.id}`} className="side-item" aria-current={g.id === game.id ? "page" : undefined}>
+              <span className="side-thumb">
+                <Art palette={g.palette} title={g.title} thumbId={g.thumbVersionId} coverId={g.hasCover ? g.latestVersionId : null} showTitle={false} />
+              </span>
+              <span>{g.title}</span>
+            </Link>
+          ))}
+        </nav>
+        <Link to="/" className="btn btn-secondary side-new">
+          <Plus size={16} aria-hidden /> Новая игра
+        </Link>
+      </aside>
+
+      <div className="stage-col">
+        <section className="stage-card">
+          <div className="stage-bar">
+            <div className="tabs" role="tablist">
+              <TabButton tab="play" current={tab} onSelect={setTab} icon={<Play size={16} weight="fill" />} label="Игра" />
+              <TabButton tab="code" current={tab} onSelect={setTab} icon={<Code size={16} weight="bold" />} label="Код" />
+              <TabButton tab="stats" current={tab} onSelect={setTab} icon={<ChartBar size={16} weight="bold" />} label="Аналитика" />
+            </div>
+            <div className="stage-actions">
+              <button
+                type="button"
+                className="btn btn-quiet btn-sm"
+                onClick={() => {
+                  setTab("play");
+                  setReloadKey((n) => n + 1);
+                }}
+              >
+                <ArrowClockwise size={16} aria-hidden /> <span className="label">Перезапустить</span>
+              </button>
+              <a className="btn btn-quiet btn-sm" href={playUrl} target="_blank" rel="noreferrer">
+                <ArrowSquareOut size={16} aria-hidden /> <span className="label">Открыть</span>
+              </a>
+            </div>
+          </div>
+          <div className="stage-body">
+            {tab === "play" && (
+              <div className="stage-play">
+                <Phone>
+                  <GameFrame
+                    gameId={game.id}
+                    versionId={version.id}
+                    reloadKey={reloadKey}
+                    onStatus={setStatus}
+                    needThumb={!version.hasThumb}
+                    onThumb={() => load(false)}
+                  />
+                </Phone>
+                <StatusLine status={status?.versionId === version.id ? status : null} repairing={repairing} />
+              </div>
+            )}
+            {tab === "code" && <CodeView version={version} />}
+            {tab === "stats" && <GameAnalytics gameId={game.id} />}
+            {op.running && tab === "play" && (
+              <div className="stage-overlay">
+                <span className="status warn">
+                  <span>{repairing ? "Исправляем ошибку запуска" : "Собираем новую версию"}</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <aside className="panel">
+        <div>
+          <h1>{version.spec.title}</h1>
+          <p className="panel-meta">
+            {GENRE_LABEL[version.spec.genre]} · {AUDIENCE_LABEL[version.spec.audience]} · обновлено {timeAgo(game.history.at(-1)!.createdAt)}
+          </p>
+          <p className="quote">{game.prompt}</p>
         </div>
-        <p className="muted prompt-quote">«{game.prompt}»</p>
-        <p>{version.spec.howToPlay}</p>
 
         <form
-          className="edit-form"
           onSubmit={(e) => {
             e.preventDefault();
             submitEdit(instruction);
           }}
         >
-          <label htmlFor="edit">Что изменить?</label>
-          <div className="edit-row">
-            <input
+          <h2>
+            <label htmlFor="edit">Что изменить?</label>
+          </h2>
+          <div className="edit-box">
+            <textarea
               id="edit"
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
-              placeholder="Например: сделай кнопки больше"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submitEdit(instruction);
+                }
+              }}
+              placeholder="Например: сделай игру медленнее и добавь три жизни"
               maxLength={500}
               disabled={op.running}
             />
-            <button type="submit" className="btn-primary" disabled={op.running || instruction.trim().length < 2}>
-              Изменить
-            </button>
+            <div className="edit-actions">
+              <span className="edit-count">{instruction.length}/500</span>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={op.running || instruction.trim().length < 2}>
+                Применить
+              </button>
+            </div>
           </div>
           {!op.running && (
-            <div className="chips">
+            <div className="quick">
               {EDIT_EXAMPLES.map((ex) => (
                 <button key={ex} type="button" className="chip" onClick={() => submitEdit(ex)}>
                   {ex}
@@ -109,62 +229,99 @@ export function GameView({ id }: { id: string }) {
               ))}
             </div>
           )}
-        </form>
-        {op.running && <Progress op={op} onCancel={cancel} />}
-        {op.error && <p className={op.error.startsWith("Не могу") ? "notice" : "error"}>{op.error}</p>}
-
-        <Share gameId={game.id} />
-
-        <div className="versions">
-          <h2>Версии</h2>
-          <ol>
-            {[...game.history].reverse().map((v) => (
-              <li key={v.id}>
-                <button
-                  type="button"
-                  className={v.id === version.id ? "version active" : "version"}
-                  onClick={() => setSelected(v.id)}
-                >
-                  <span className="v-num">v{v.version}</span>
-                  <span className="v-text">
-                    {v.kind === "repair" ? "Автоисправление ошибки" : v.instruction}
-                  </span>
+          {op.running && (
+            <div className="mini-steps" aria-live="polite">
+              <Steps op={op} />
+              <div className="mini-foot">
+                <span>
+                  {repairing ? "Автоисправление" : "Правка"} · <Elapsed op={op} />
+                </span>
+                <button type="button" className="btn btn-quiet btn-sm" onClick={cancel}>
+                  Отменить
                 </button>
-              </li>
+              </div>
+            </div>
+          )}
+          {op.error && (
+            <p className={`alert ${op.error.startsWith("Не могу") ? "alert-notice" : "alert-err"}`} style={{ marginTop: 12 }}>
+              {op.error}
+            </p>
+          )}
+        </form>
+
+        <section>
+          <h2>Версии</h2>
+          <ol className="versions">
+            {[...game.history].reverse().map((v) => (
+              <VersionRow key={v.id} v={v} current={v.id === version.id} latest={v.id === game.latestVersionId} onSelect={() => setSelected(v.id)} />
             ))}
           </ol>
-        </div>
-      </section>
+        </section>
 
-      <section className="game-stage">
-        <div className="phone">
-          <GameFrame gameId={game.id} versionId={version.id} reloadKey={reloadKey} onStatus={setStatus} />
-        </div>
-        <div className="frame-status">
-          <StatusLine status={status?.versionId === version.id ? status : null} repairing={repairing} />
-          <button type="button" className="btn-ghost" onClick={() => setReloadKey((n) => n + 1)}>
-            Перезапустить
-          </button>
-        </div>
-      </section>
+        <Share gameId={game.id} />
+      </aside>
     </main>
   );
 }
 
+function TabButton({ tab, current, onSelect, icon, label }: { tab: Tab; current: Tab; onSelect: (t: Tab) => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button type="button" role="tab" className="tab" aria-selected={tab === current} onClick={() => onSelect(tab)}>
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function VersionRow({ v, current, latest, onSelect }: { v: GameVersion; current: boolean; latest: boolean; onSelect: () => void }) {
+  const title = v.kind === "repair" ? "Автоисправление ошибки" : v.kind === "create" ? "Создана по запросу" : v.instruction;
+  return (
+    <li>
+      <button type="button" className="version" aria-current={current} onClick={onSelect}>
+        <span className="v-num">v{v.version}</span>
+        <span className="side-thumb">
+          <Art palette={v.spec.palette} title={v.spec.title} thumbId={v.hasThumb ? v.id : null} showTitle={false} />
+        </span>
+        <span className="v-text">
+          <span className="v-title">{title}</span>
+          <span className="v-time">{timeAgo(v.createdAt)}</span>
+        </span>
+        {latest && <span className="tag tag-accent">Текущая</span>}
+      </button>
+    </li>
+  );
+}
+
 function StatusLine({ status, repairing }: { status: FrameStatus | null; repairing: boolean }) {
-  if (repairing) return <span className="status warn">Нашли ошибку, исправляем</span>;
-  if (!status) return <span className="status">Запуск…</span>;
+  if (repairing)
+    return (
+      <span className="status warn">
+        <span>Нашли ошибку, исправляем</span>
+      </span>
+    );
+  if (!status || status.kind === "loading")
+    return (
+      <span className="status">
+        <span>Запуск</span>
+      </span>
+    );
   switch (status.kind) {
-    case "loading":
-      return <span className="status">Запуск…</span>;
     case "ready":
-      return <span className="status ok">Запуск проверен</span>;
+      return (
+        <span className="status ok">
+          <span>Запуск проверен</span>
+        </span>
+      );
     case "stuck":
-      return <span className="status warn">Игра не ответила за 6 секунд</span>;
+      return (
+        <span className="status warn">
+          <span>Игра не ответила за 6 секунд</span>
+        </span>
+      );
     case "error":
       return (
         <span className="status err" title={status.message}>
-          Ошибка: {status.message.split("\n")[0]}
+          <span>Ошибка: {status.message.split("\n")[0]}</span>
         </span>
       );
   }
@@ -182,7 +339,7 @@ function Share({ gameId }: { gameId: string }) {
       .then((base) => {
         const u = `${base.replace(/\/$/, "")}/play/${gameId}`;
         setUrl(u);
-        return QRCode.toDataURL(u, { margin: 1, width: 240 });
+        return QRCode.toDataURL(u, { margin: 0, width: 240 });
       })
       .then(setQr)
       .catch(() => setQr(""));
@@ -190,26 +347,33 @@ function Share({ gameId }: { gameId: string }) {
 
   if (!url) return null;
   return (
-    <div className="share">
-      {qr && <img src={qr} alt="QR-код ссылки на игру" width={120} height={120} />}
-      <div>
-        <h2>Ссылка на игру</h2>
-        <a href={url} target="_blank" rel="noreferrer" className="share-url">
-          {url.replace(/^https?:\/\//, "")}
-        </a>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() =>
-            navigator.clipboard?.writeText(url).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            })
-          }
-        >
-          {copied ? "Скопировано" : "Копировать"}
-        </button>
+    <section>
+      <h2>Поделиться</h2>
+      <div className="share">
+        {qr ? <img src={qr} alt="QR-код ссылки на игру" /> : <span />}
+        <div className="share-side">
+          <div className="share-url">
+            <span className="share-link">{url.replace(/^https?:\/\//, "")}</span>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label={copied ? "Скопировано" : "Скопировать ссылку"}
+              title={copied ? "Скопировано" : "Скопировать ссылку"}
+              onClick={() =>
+                navigator.clipboard?.writeText(url).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                })
+              }
+            >
+              {copied ? <Check size={16} weight="bold" /> : <Copy size={16} />}
+            </button>
+          </div>
+          <a className="link" href={url} target="_blank" rel="noreferrer">
+            Открыть в новой вкладке <ArrowSquareOut size={14} aria-hidden />
+          </a>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

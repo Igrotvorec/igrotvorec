@@ -27,3 +27,17 @@ export const PROMPT_EXAMPLES = [
 ];
 
 export const EDIT_EXAMPLES = ["Сделай кнопки больше", "Добавь уровни", "Сделай медленнее", "Ярче цвета", "Добавь жизни"];
+
+const rtf = new Intl.RelativeTimeFormat("ru", { numeric: "auto" });
+
+/** «5 минут назад», «вчера», затем дата. */
+export function timeAgo(ts: number) {
+  const s = Math.round((ts - Date.now()) / 1000);
+  if (s > -60) return "только что";
+  if (s > -3600) return rtf.format(Math.round(s / 60), "minute");
+  if (s > -86400) return rtf.format(Math.round(s / 3600), "hour");
+  if (s > -7 * 86400) return rtf.format(Math.round(s / 86400), "day");
+  return new Date(ts).toLocaleDateString("ru", { day: "numeric", month: "short" });
+}
+
+export const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");

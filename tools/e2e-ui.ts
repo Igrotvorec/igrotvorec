@@ -13,7 +13,7 @@ const OUT = "data/shots";
 
 const t0 = Date.now();
 const log = (msg: string) => console.log(`${((Date.now() - t0) / 1000).toFixed(0).padStart(4)}s  ${msg}`);
-const statusText = (page: Page) => page.$eval(".frame-status .status", (el) => el.textContent ?? "").catch(() => "");
+const statusText = (page: Page) => page.$eval(".stage-play .status", (el) => el.textContent ?? "").catch(() => "");
 
 async function waitStatus(page: Page, timeoutMs: number) {
   const until = Date.now() + timeoutMs;
@@ -31,13 +31,15 @@ let failed = false;
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
+  if (process.env.SCHEME) await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: process.env.SCHEME }]);
   page.on("pageerror", (e) => log(`pageerror: ${(e as Error).message}`));
 
   await page.goto(WEB, { waitUntil: "networkidle0" });
   await page.type("textarea", PROMPT);
-  await page.click(".prompt-form button[type=submit]");
+  await page.click(".composer button[type=submit]");
   log(`отправлен промпт «${PROMPT}»`);
-  await page.waitForSelector(".progress", { timeout: 10_000 });
+  await page.waitForSelector(".build", { timeout: 10_000 });
+  await page.waitForSelector(".spec-card", { timeout: 60_000 }).catch(() => {});
   await page.screenshot({ path: `${OUT}/e2e-1-progress.png` });
 
   await page.waitForFunction(() => location.pathname.startsWith("/games/"), { timeout: 240_000 });
@@ -47,7 +49,7 @@ try {
   if (!s1.includes("Запуск проверен")) failed = true;
   await page.screenshot({ path: `${OUT}/e2e-2-game.png` });
 
-  const chip = (await page.$$(".edit-form .chip"))[0];
+  const chip = (await page.$$(".quick .chip"))[0];
   if (!chip) throw new Error("нет чипов правки");
   const chipText = await chip.evaluate((el) => el.textContent);
   await chip.click();
@@ -60,7 +62,7 @@ try {
   if (!s2.includes("Запуск проверен")) failed = true;
   await page.screenshot({ path: `${OUT}/e2e-3-edited.png` });
 
-  const share = await page.$eval(".share-url", (el) => el.textContent).catch(() => null);
+  const share = await page.$eval(".share-link", (el) => el.textContent).catch(() => null);
   log(`ссылка: ${share}`);
   if (!share) failed = true;
 } catch (e) {

@@ -1,4 +1,4 @@
-import type { GameDetail, GameSummary, GenEvent, SegmentStatsDto } from "@gg/shared";
+import type { GameDetail, GameStatsDto, GameSummary, GenEvent, SegmentStatsDto } from "@gg/shared";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -11,6 +11,10 @@ async function json<T>(res: Response): Promise<T> {
 export const listGames = () => fetch("/api/games").then((r) => json<GameSummary[]>(r));
 export const getGame = (id: string) => fetch(`/api/games/${id}`).then((r) => json<GameDetail>(r));
 export const getStats = () => fetch("/api/stats").then((r) => json<{ minSessions: number; segments: SegmentStatsDto[] }>(r));
+export const getGameStats = (id: string) => fetch(`/api/games/${id}/stats`).then((r) => json<GameStatsDto>(r));
+export const getCode = (versionId: string) => fetch(`/api/versions/${versionId}/code`).then((r) => json<{ code: string }>(r));
+export const postThumb = (versionId: string, image: string) =>
+  fetch(`/api/thumbs/${versionId}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image }) }).catch(() => {});
 export const getConfig = () => fetch("/api/config").then((r) => json<{ publicUrl: string }>(r));
 
 /** Делает POST и читает SSE-ответ, вызывая onEvent на каждое событие. Завершается вместе с потоком. */
