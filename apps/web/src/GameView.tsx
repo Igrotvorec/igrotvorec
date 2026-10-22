@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
-  ArrowLeftIcon as ArrowLeft,
   ArrowSquareOutIcon as ArrowSquareOut,
   ArrowClockwiseIcon as ArrowClockwise,
   ChartBarIcon as ChartBar,
@@ -15,6 +14,8 @@ import type { GameDetail, GameSummary, GameVersion } from "@gg/shared";
 import { getConfig, getGame, listGames } from "./api";
 import { Art } from "./Art";
 import { Elapsed, Steps } from "./Build";
+import { ErrorNote } from "./ErrorNote";
+import { useAutosize } from "./useAutosize";
 import { CodeView } from "./CodeView";
 import { GameAnalytics } from "./GameAnalytics";
 import { GameFrame, type FrameStatus } from "./GameFrame";
@@ -24,6 +25,11 @@ import { useOperation } from "./useOperation";
 import { Link } from "./router";
 
 type Tab = "play" | "code" | "stats";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "play", label: "Игра" },
+  { id: "code", label: "Код" },
+  { id: "stats", label: "Аналитика" },
+];
 
 export function GameView({ id }: { id: string }) {
   const [game, setGame] = useState<GameDetail | null>(null);
@@ -36,6 +42,8 @@ export function GameView({ id }: { id: string }) {
   const [instruction, setInstruction] = useState("");
   const [opKind, setOpKind] = useState<"edit" | "repair">("edit");
   const repairedRef = useRef(new Set<string>());
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  useAutosize(editRef, instruction);
 
   const load = useCallback(
     (selectLatest: boolean) =>
@@ -109,9 +117,6 @@ export function GameView({ id }: { id: string }) {
   return (
     <main className="workspace">
       <aside className="side" aria-label="Игры">
-        <Link to="/" className="btn btn-quiet side-back">
-          <ArrowLeft size={16} aria-hidden /> Все игры
-        </Link>
         <nav className="side-list">
           {games.map((g) => (
             <Link key={g.id} to={`/games/${g.id}`} className="side-item" aria-current={g.id === game.id ? "page" : undefined}>
@@ -130,28 +135,26 @@ export function GameView({ id }: { id: string }) {
       <div className="stage-col">
         <section className="stage-card">
           <div className="stage-bar">
-            <div className="tabs" role="tablist">
-              <TabButton tab="play" current={tab} onSelect={setTab} icon={<Play size={16} weight="fill" />} label="Игра" />
-              <TabButton tab="code" current={tab} onSelect={setTab} icon={<Code size={16} weight="bold" />} label="Код" />
-              <TabButton tab="stats" current={tab} onSelect={setTab} icon={<ChartBar size={16} weight="bold" />} label="Аналитика" />
-            </div>
+            <Tabs tab={tab} onSelect={setTab} />
             <div className="stage-actions">
               <button
                 type="button"
-                className="btn btn-quiet btn-sm"
+                className="icon-btn icon-btn-lg"
+                aria-label="Перезапустить игру"
+                title="Перезапустить игру"
                 onClick={() => {
                   setTab("play");
                   setReloadKey((n) => n + 1);
                 }}
               >
-                <ArrowClockwise size={16} aria-hidden /> <span className="label">Перезапустить</span>
+                <ArrowClockwise size={18} aria-hidden />
               </button>
-              <a className="btn btn-quiet btn-sm" href={playUrl} target="_blank" rel="noreferrer">
-                <ArrowSquareOut size={16} aria-hidden /> <span className="label">Открыть</span>
+              <a className="icon-btn icon-btn-lg" href={playUrl} target="_blank" rel="noreferrer" aria-label="Открыть игру в новой вкладке" title="Открыть игру в новой вкладке">
+                <ArrowSquareOut size={18} aria-hidden />
               </a>
             </div>
           </div>
-          <div className="stage-body">
+          <div className="stage-body" role="tabpanel" id="stage-panel" aria-labelledby={`tab-${tab}`}>
             {tab === "play" && (
               <div className="stage-play">
                 <Phone>
@@ -184,7 +187,7 @@ export function GameView({ id }: { id: string }) {
         <div>
           <h1>{version.spec.title}</h1>
           <p className="panel-meta">
-            {GENRE_LABEL[version.spec.genre]} · {AUDIENCE_LABEL[version.spec.audience]} · обновлено {timeAgo(game.history.at(-1)!.createdAt)}
+            {GENRE_LABEL[version.spec.genre]} · {AUDIENCE_LABEL[version.spec.audience]} · v{version.version}, {timeAgo(version.createdAt)}
           </p>
           <p className="quote">{game.prompt}</p>
         </div>
@@ -198,9 +201,18 @@ export function GameView({ id }: { id: string }) {
           <h2>
             <label htmlFor="edit">Что изменить?</label>
           </h2>
+          {!isLatest && (
+            <p className="edit-base">
+              Правка применится к последней версии v{game.history.at(-1)!.version}.{" "}
+              <button type="button" className="link" onClick={() => setSelected(game.latestVersionId)}>
+                Открыть её
+              </button>
+            </p>
+          )}
           <div className="edit-box">
             <textarea
               id="edit"
+              ref={editRef}
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
               onKeyDown={(e) => {
@@ -223,14 +235,25 @@ export function GameView({ id }: { id: string }) {
           {!op.running && (
             <div className="quick">
               {EDIT_EXAMPLES.map((ex) => (
-                <button key={ex} type="button" className="chip" onClick={() => submitEdit(ex)}>
+                <button
+                  key={ex}
+                  type="button"
+                  className="chip"
+                  onClick={() => {
+                    setInstruction(ex);
+                    editRef.current?.focus();
+                  }}
+                >
                   {ex}
                 </button>
               ))}
             </div>
           )}
           {op.running && (
-            <div className="mini-steps" aria-live="polite">
+            <div className="mini-steps">
+              <p className="sr-only" aria-live="polite">
+                {op.message}
+              </p>
               <Steps op={op} />
               <div className="mini-foot">
                 <span>
@@ -242,11 +265,7 @@ export function GameView({ id }: { id: string }) {
               </div>
             </div>
           )}
-          {op.error && (
-            <p className={`alert ${op.error.startsWith("Не могу") ? "alert-notice" : "alert-err"}`} style={{ marginTop: 12 }}>
-              {op.error}
-            </p>
-          )}
+          <ErrorNote op={op} />
         </form>
 
         <section>
@@ -264,12 +283,41 @@ export function GameView({ id }: { id: string }) {
   );
 }
 
-function TabButton({ tab, current, onSelect, icon, label }: { tab: Tab; current: Tab; onSelect: (t: Tab) => void; icon: React.ReactNode; label: string }) {
+/** Вкладки по шаблону WAI-ARIA: одна в порядке Tab, стрелки и Home/End переключают. */
+function Tabs({ tab, onSelect }: { tab: Tab; onSelect: (t: Tab) => void }) {
+  const icons: Record<Tab, React.ReactNode> = {
+    play: <Play size={16} weight="fill" aria-hidden />,
+    code: <Code size={16} weight="bold" aria-hidden />,
+    stats: <ChartBar size={16} weight="bold" aria-hidden />,
+  };
+  const move = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const i = TABS.findIndex((t) => t.id === tab);
+    const next = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const t = TABS[(next + TABS.length) % TABS.length]!.id;
+    onSelect(t);
+    document.getElementById(`tab-${t}`)?.focus();
+  };
   return (
-    <button type="button" role="tab" className="tab" aria-selected={tab === current} onClick={() => onSelect(tab)}>
-      {icon}
-      {label}
-    </button>
+    <div className="tabs" role="tablist" aria-label="Режим" onKeyDown={move}>
+      {TABS.map((t) => (
+        <button
+          key={t.id}
+          id={`tab-${t.id}`}
+          type="button"
+          role="tab"
+          className="tab"
+          aria-selected={t.id === tab}
+          aria-controls="stage-panel"
+          tabIndex={t.id === tab ? 0 : -1}
+          onClick={() => onSelect(t.id)}
+        >
+          {icons[t.id]}
+          {t.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -283,10 +331,12 @@ function VersionRow({ v, current, latest, onSelect }: { v: GameVersion; current:
           <Art palette={v.spec.palette} title={v.spec.title} thumbId={v.hasThumb ? v.id : null} showTitle={false} />
         </span>
         <span className="v-text">
-          <span className="v-title">{title}</span>
+          <span className="v-title" title={title}>
+            {title}
+          </span>
           <span className="v-time">{timeAgo(v.createdAt)}</span>
         </span>
-        {latest && <span className="tag tag-accent">Текущая</span>}
+        {latest && <span className="tag tag-accent">Последняя</span>}
       </button>
     </li>
   );
@@ -353,7 +403,9 @@ function Share({ gameId }: { gameId: string }) {
         {qr ? <img src={qr} alt="QR-код ссылки на игру" /> : <span />}
         <div className="share-side">
           <div className="share-url">
-            <span className="share-link">{url.replace(/^https?:\/\//, "")}</span>
+            <span className="share-link" title={url}>
+              {new URL(url).pathname}
+            </span>
             <button
               type="button"
               className="icon-btn"

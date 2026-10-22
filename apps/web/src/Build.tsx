@@ -63,7 +63,10 @@ export function Build({ prompt, op, onCancel }: { prompt: string; op: OpState; o
   const spec = op.spec;
   const palette = spec?.palette;
   return (
-    <section className="build" aria-live="polite">
+    <section className="build">
+      <p className="sr-only" aria-live="polite">
+        {op.message}
+      </p>
       <div>
         <h1>Собираем игру</h1>
         <p className="build-prompt">{prompt}</p>

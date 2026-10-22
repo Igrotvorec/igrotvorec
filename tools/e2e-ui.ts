@@ -53,6 +53,7 @@ try {
   if (!chip) throw new Error("нет чипов правки");
   const chipText = await chip.evaluate((el) => el.textContent);
   await chip.click();
+  await page.click(".edit-box button[type=submit]");
   log(`правка: «${chipText}»`);
   await page.waitForFunction(() => document.querySelectorAll(".versions li").length >= 2, { timeout: 240_000 });
   const versions = await page.$$eval(".versions .v-text", (els) => els.map((e) => e.textContent));

@@ -4,6 +4,8 @@ import type { GameSummary, Genre } from "@gg/shared";
 import { listGames } from "./api";
 import { Art } from "./Art";
 import { Build } from "./Build";
+import { ErrorNote } from "./ErrorNote";
+import { useAutosize } from "./useAutosize";
 import { AUDIENCE_LABEL, GENRE_LABEL, PROMPT_EXAMPLES } from "./labels";
 import { Phone } from "./Phone";
 import { useOperation } from "./useOperation";
@@ -16,7 +18,11 @@ export function Home() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [genre, setGenre] = useState<Genre | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { state: op, run, cancel } = useOperation((e) => navigate(`/games/${e.gameId}`));
+  // Если пока шла генерация пользователь ушёл смотреть другую игру, не выдёргиваем его оттуда.
+  const { state: op, run, cancel } = useOperation((e) => {
+    if (location.pathname === "/") navigate(`/games/${e.gameId}`);
+  });
+  useAutosize(inputRef, prompt);
 
   useEffect(() => {
     listGames().then(setGames, (e: Error) => setLoadError(e.message));
@@ -86,11 +92,7 @@ export function Home() {
                 <ArrowRight size={16} weight="bold" aria-hidden />
               </button>
             </form>
-            {op.error && (
-              <p className={`alert ${op.error.startsWith("Не могу") ? "alert-notice" : "alert-err"}`} style={{ marginTop: 14 }}>
-                {op.error}
-              </p>
-            )}
+            <ErrorNote op={op} />
             <div className="try">
               <span className="try-label">Попробуйте:</span>
               {PROMPT_EXAMPLES.map((ex) => (

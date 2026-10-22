@@ -7,7 +7,7 @@ import { config } from "./config";
 import sharp from "sharp";
 import { MAX_THUMB_CHARS } from "@gg/shared";
 import { addEvent, gamePath, getGame, getVersion, listGames, saveThumb, thumbPath } from "./db";
-import { edit, generate, repair } from "./pipeline";
+import { RefusalError, edit, generate, repair } from "./pipeline";
 import { playShell } from "./play";
 import { MIN_SESSIONS, gameStats, segmentStats } from "./stats";
 import { spriteBytes } from "./assets";
@@ -71,7 +71,7 @@ function sseOperation(run: (emit: (e: GenEvent) => void, signal: AbortSignal) =>
       } catch (err) {
         const message = ac.signal.aborted ? "Превышено время генерации" : (err as Error).message || "Ошибка генерации";
         console.error("[gen]", err);
-        emit({ type: "error", message });
+        emit({ type: "error", message, ...(err instanceof RefusalError ? { kind: "refusal" as const } : {}) });
       } finally {
         clearInterval(ping);
         clearTimeout(deadline);

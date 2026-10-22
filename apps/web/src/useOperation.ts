@@ -19,10 +19,12 @@ export interface OpState {
   chars: number;
   spec: GameSpec | null;
   error: string | null;
+  /** Ошибка — осознанный отказ модели, а не сбой: показывается спокойнее. */
+  refusal: boolean;
   startedAt: number;
 }
 
-const idle: OpState = { running: false, stage: null, message: "", marks: [], chars: 0, spec: null, error: null, startedAt: 0 };
+const idle: OpState = { running: false, stage: null, message: "", marks: [], chars: 0, spec: null, error: null, refusal: false, startedAt: 0 };
 
 /** Ведёт одну SSE-операцию (генерация, правка, исправление) и отдаёт её текущий прогресс. */
 export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) => void) {
@@ -48,7 +50,7 @@ export function useOperation(onDone: (e: Extract<GenEvent, { type: "done" }>) =>
           else if (e.type === "spec") setState((s) => ({ ...s, spec: e.spec }));
           else if (e.type === "error") {
             finished = true;
-            setState((s) => ({ ...s, running: false, error: e.message }));
+            setState((s) => ({ ...s, running: false, error: e.message, refusal: e.kind === "refusal" }));
           } else if (e.type === "done") {
             finished = true;
             setState((s) => ({ ...s, running: false }));

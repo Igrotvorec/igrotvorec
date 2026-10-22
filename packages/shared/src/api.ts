@@ -39,7 +39,8 @@ export type GenEvent =
   | { type: "spec"; spec: GameSpec }
   | { type: "progress"; chars: number }
   | { type: "done"; gameId: string; versionId: string; version: number }
-  | { type: "error"; message: string }
+  /** kind "refusal" — осознанный отказ модели (вредный или не игровой запрос), а не сбой. */
+  | { type: "error"; message: string; kind?: "refusal" }
   | { type: "ping" };
 
 /** Агрегат телеметрии /play по сегменту «аудитория × жанр». */

@@ -5,7 +5,7 @@ export const AUDIENCE_LABEL: Record<Audience, string> = {
   teens: "Подростки",
   adults: "Взрослые",
   seniors: "Пожилые",
-  general: "Все",
+  general: "Для всех",
 };
 
 export const GENRE_LABEL: Record<Genre, string> = {

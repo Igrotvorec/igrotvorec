@@ -72,7 +72,8 @@ async function makeSpec(system: string, user: string, signal: AbortSignal): Prom
   signal.throwIfAborted();
   if (raw.allowed !== true) {
     const reason = typeof raw.refusalReason === "string" && raw.refusalReason.trim() ? raw.refusalReason.trim().slice(0, 300) : "запрос не похож на игру";
-    throw new RefusalError(`Не могу сделать такую игру: ${reason}`);
+    // Причину показываем как есть: модель пишет её законченной фразой для пользователя.
+    throw new RefusalError(reason.charAt(0).toUpperCase() + reason.slice(1));
   }
   const parsed = GameSpecSchema.safeParse(normalizeSpec(raw.spec));
   if (!parsed.success) throw new Error(`Spec failed validation: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`);
