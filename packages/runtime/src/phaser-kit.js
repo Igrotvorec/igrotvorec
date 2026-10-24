@@ -772,7 +772,10 @@
     if (gesture && botQueue.some(function (c) { return c.type === "tap" || c.type === "down"; })) return;
     // Во время отвлечения теряются только движения; нажатия и отпускания доходят после него.
     if (simNow < distractedUntil && type === "move") return;
-    if (gesture) noiseTarget = botNoise = newNoise();
+    if (gesture) {
+      botNoise = newNoise();
+      noiseTarget = { x: botNoise.x, y: botNoise.y };
+    }
     var at = Math.max(simNow + botReaction(), type === "move" ? 0 : distractedUntil);
     botQueue.push({ t: at, type: type, rx: x, ry: y });
   }
@@ -902,6 +905,8 @@
     var tried = {};
     var chosen = null;
     var midTried = false;
+    var inWindow = null;
+    var probed = false;
     /** После вставки промежуточной ступени индексы выше неё сдвигаются на один. */
     function remapTried(t, at) {
       var out = {};
@@ -954,7 +959,14 @@
           break;
         }
         if (!r.tooHard && !r.tooEasy) {
-          chosen = r;
+          inWindow = r;
+          // Одна выборка в окне ещё не точка цели: пробуем соседнюю ступень, чтобы было что интерполировать.
+          var probe = r.carelessWins / 16 > (calm ? 0.75 : 0.5) ? idx + 1 : idx - 1;
+          if (probe >= 0 && probe < ladder.length && !tried[probe + ":" + lives0 + ":" + timeLimit0] && !probed) {
+            probed = true;
+            idx = probe;
+            continue;
+          }
           break;
         }
         var next = r.tooHard ? idx - 1 : idx + 1;
@@ -996,6 +1008,29 @@
       if (!triedList.some(function (t) { return t.goodWon; }) || triedList.some(function (t) { return t.idleWon && !t.goodWon; })) {
         return { skipped: true, reason: "bot", factor: 1, lives: baseLives, timeLimitSec: baseTime, goodMs: 0, carelessWins: 0, carelessMs: 0, randomWon: false, tried: triedList.length, ms: Date.now() - started };
       }
+      // Выборка из 16 раундов шумит на ±2 победы, а окно 6-10: точку цели берём по кривой через
+      // испробованные ступени (линейно между соседями по разные стороны цели) и проверяем 32 раундами.
+      var target = calm ? 0.75 : 0.5;
+      var pts = triedList.filter(function (t) { return t.lives === lives0 && t.timeLimitSec === timeLimit0 && t.goodWon && !t.stallBound; }).sort(function (a, b) { return a.factor - b.factor; });
+      for (var pi = 0; !chosen && pi + 1 < pts.length; pi++) {
+        var lo = pts[pi], hi = pts[pi + 1];
+        var wl = lo.carelessWins / 16, wh = hi.carelessWins / 16;
+        if (wl >= target && wh <= target && wl !== wh && Date.now() - started < BUDGET_MS) {
+          var fi = Math.round((lo.factor + ((wl - target) / (wl - wh)) * (hi.factor - lo.factor)) * 100) / 100;
+          cfg.speed = base * fi;
+          speedFactor = fi;
+          var lim2 = timeLimit0 ? timeLimit0 * 1000 + 2000 : limit;
+          var big = [];
+          for (var bi = 0; bi < 32; bi++) big.push(simRound(0.5, lim2));
+          var g2 = simRound(1, lim2);
+          if (g2 && big.every(Boolean)) {
+            var bw = big.filter(function (g) { return g.won; }).length;
+            chosen = { factor: fi, lives: lives0, timeLimitSec: timeLimit0, goodWon: g2.won, goodMs: Math.round(g2.ms), carelessWins: Math.round(bw / 2), carelessMs: Math.round(big.reduce(function (s, g) { return s + g.ms; }, 0) / big.length), randomWon: lo.randomWon && hi.randomWon, tooHard: !g2.won || bw < (calm ? 18 : 10), tooEasy: (lo.randomWon && hi.randomWon) || (!calm && bw > 22), interpolated: true };
+          }
+          break;
+        }
+      }
+      if (!chosen && inWindow) chosen = inWindow;
       if (!chosen) {
         // Точно в цель не попали. Если есть не слишком сложные варианты — самый сложный из них;
         // если всё слишком сложно — самый лёгкий, где хороший игрок ещё выигрывает.
