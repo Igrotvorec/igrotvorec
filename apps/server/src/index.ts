@@ -5,10 +5,10 @@ import { z } from "zod";
 import type { GenEvent } from "@gg/shared";
 import { config } from "./config";
 import sharp from "sharp";
-import { MAX_THUMB_CHARS } from "@gg/shared";
-import { addEvent, getGame, getVersion, listGames, needsThumb, recoverThumbClaims, saveThumb, thumbPath } from "./db";
+import { MAX_THUMB_CHARS, parseGameMessage } from "@gg/shared";
+import { addEvent, gamePath, saveTuning, getGame, getVersion, listGames, needsThumb, recoverThumbClaims, saveThumb, thumbPath } from "./db";
 import { thumbTokenValid } from "./thumbs";
-import { currentHtml } from "./html";
+import { currentHtml, rebuildHtml, writeAtomic } from "./html";
 import { clientIp, takeOperation } from "./ratelimit";
 import { bodyLimit } from "hono/body-limit";
 import { RUNTIME_VERSION } from "@gg/runtime";
@@ -205,6 +205,27 @@ app.post(
   },
 );
 
+const TuneBody = z.strictObject({ token: z.string().max(64), report: z.unknown() });
+
+/**
+ * Итог автоподбора сложности из превью автора: множитель скорости записывается в спеку версии,
+ * HTML пересобирается с ним. Отчёт пришёл из недоверенного iframe — проверяется тем же парсером
+ * протокола (factor только из лестницы рантайма), право — токен автора, один раз на версию.
+ */
+app.post("/api/versions/:versionId/tune", bodyLimit({ maxSize: 4096, onError: (c) => c.body(null, 413) }), async (c) => {
+  const id = c.req.param("versionId");
+  const body = TuneBody.safeParse(await c.req.json().catch(() => null));
+  if (!body.success || !/^[a-f0-9]{10}$/.test(id)) return c.body(null, 400);
+  if (!thumbTokenValid(id, body.data.token)) return c.body(null, 403);
+  const msg = parseGameMessage({ gg: 1, runId: "x", type: "tune", report: body.data.report }, "x");
+  if (!msg || msg.type !== "tune") return c.body(null, 400);
+  const tuning = msg.report ? { ...msg.report, skipped: false } : { factor: 1, skipped: true };
+  if (!saveTuning(id, tuning)) return c.body(null, 204);
+  const html = rebuildHtml(id);
+  if (html) await writeAtomic(gamePath(id), html);
+  return c.json({ factor: tuning.factor });
+});
+
 app.get("/thumb/:versionId", async (c) => {
   const id = c.req.param("versionId");
   if (!/^[a-f0-9]{10}$/.test(id)) return c.notFound();
@@ -234,7 +255,7 @@ app.get("/g/:versionId", async (c) => {
     "x-content-type-options": "nosniff",
     // HTML всегда собран текущим рантаймом (currentHtml), поэтому адрес с его версией неизменен;
     // без версии (старые ссылки) — короткий кэш.
-    "cache-control": c.req.query("r") === RUNTIME_VERSION ? "public, max-age=31536000, immutable" : "public, max-age=600",
+    "cache-control": (c.req.query("r") ?? "").split("-")[0] === RUNTIME_VERSION ? "public, max-age=31536000, immutable" : "public, max-age=600",
   });
 });
 
@@ -260,6 +281,7 @@ app.get("/play/:gameId", (c) => {
     description: version.spec.howToPlay,
     url: `${base}/play/${game.id}`,
     image,
+    tuning: version.spec.tuning?.factor,
   });
   return c.html(shell, 200, {
     "content-security-policy": SHELL_CSP,

@@ -1,7 +1,7 @@
 /**
- * Обложки для игр, у которых их нет (например, сгенерированных бенчмарком без открытия превью).
- * Открывает каждую игру в Chrome с того же origin, получает кадр от рантайма и отправляет его
- * с токеном автора, вычисленным из секрета сервера (нужен тот же DATA_DIR).
+ * То, что обычно делает превью автора, для игр, которые никто не открывал (бенчмарк, демо-галерея):
+ * снимок для обложки и автоподбор сложности ботами. Открывает каждую игру в Chrome с того же origin,
+ * получает кадр и отчёт подбора от рантайма и отправляет их с токеном автора (нужен тот же DATA_DIR).
  *
  *   DATA_DIR=./data-demo bun --env-file=.env tools/make-thumbs.ts [baseUrl]
  */
@@ -14,9 +14,11 @@ const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/M
 const rows = db
   .query(
     `SELECT v.id FROM versions v JOIN games g ON g.id = v.game_id
-     WHERE g.listed = 1 AND v.has_thumb = 0 AND v.version = (SELECT MAX(version) FROM versions WHERE game_id = g.id)`,
+     WHERE g.listed = 1 AND v.version = (SELECT MAX(version) FROM versions WHERE game_id = g.id)
+       AND (v.has_thumb = 0 OR (json_extract(v.spec, '$.engine') = 'phaser' AND json_extract(v.spec, '$.tuning') IS NULL))`,
   )
   .all() as { id: string }[];
+
 const runtime = ((await (await fetch(`${BASE}/api/config`)).json()) as { runtimeVersion: string }).runtimeVersion;
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true });
@@ -28,6 +30,7 @@ try {
   for (const { id } of rows) {
     const status = await page.evaluate(
       async (id, runtime, token) => {
+        let tuneStatus = "нет";
         const frame = document.createElement("iframe");
         frame.setAttribute("sandbox", "allow-scripts");
         frame.style.cssText = "position:fixed;inset:0;width:390px;height:844px;border:0";
@@ -40,19 +43,36 @@ try {
             done(e.data.image);
           });
         });
-        frame.src = `/g/${id}?r=${runtime}#run=thumbs&thumb=1`;
+        const tuned = new Promise<unknown>((done) => {
+          const t = setTimeout(() => done(undefined), 90000);
+          addEventListener("message", function on(e) {
+            if (e.source !== frame.contentWindow || e.data?.type !== "tune") return;
+            removeEventListener("message", on);
+            clearTimeout(t);
+            done(e.data.report);
+          });
+        });
+        frame.src = `/g/${id}?r=${runtime}#run=thumbs&thumb=1&tune=1`;
         document.body.appendChild(frame);
         const image = await got;
+        let thumbStatus = "нет кадра";
+        if (image) {
+          const res = await fetch(`/api/thumbs/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image, token }) });
+          thumbStatus = String(res.status);
+        }
+        const report = await tuned;
+        if (report !== undefined) {
+          const res = await fetch(`/api/versions/${id}/tune`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ report, token }) });
+          tuneStatus = `${res.status} ${JSON.stringify(report)}`;
+        }
         frame.remove();
-        if (!image) return "нет кадра";
-        const res = await fetch(`/api/thumbs/${id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image, token }) });
-        return String(res.status);
+        return `обложка ${thumbStatus}; сложность ${tuneStatus}`;
       },
       id,
       runtime,
       thumbToken(id),
     );
-    if (status === "204") ok++;
+    if (status.startsWith("обложка 204")) ok++;
     console.log(id, status);
   }
 } finally {

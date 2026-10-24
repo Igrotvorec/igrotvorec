@@ -58,7 +58,9 @@ export function kitConfig(spec: GameSpec, assets: SpriteMap): KitConfig {
 export function assembleVersion(spec: GameSpec, assets: SpriteMap, code: string): string {
   if (engineOf(spec) === "kit") return assembleGame(kitConfig(spec, assets), code, spec.language);
   const base = kitConfig(spec, assets);
-  return assemblePhaserGame({ ...base, background: assets.bg ?? null, music: spec.music, balance: spec.balance }, code, spec.language);
+  // Множитель из автоподбора сложности ботами (если превью автора его уже провело).
+  const speed = base.speed * (spec.tuning?.factor ?? 1);
+  return assemblePhaserGame({ ...base, speed, background: assets.bg ?? null, music: spec.music, balance: spec.balance }, code, spec.language);
 }
 
 /**

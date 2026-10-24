@@ -52,6 +52,17 @@ export const GameSpecSchema = z.object({
   music: z.enum(MUSIC_MOODS).optional(),
   /** Рецепт жанра из research/genre-recipes.json или "custom" (Phaser). */
   recipe: z.string().max(32).optional(),
+  /** Итог автоподбора сложности ботами в превью автора (Phaser); factor умножает GG.speed. */
+  tuning: z
+    .object({
+      factor: z.number(),
+      goodMs: z.number().optional(),
+      carelessWins: z.number().optional(),
+      carelessMs: z.number().optional(),
+      randomWon: z.boolean().optional(),
+      skipped: z.boolean().optional(),
+    })
+    .optional(),
   /** Баланс числами (Phaser): код обязан брать значения отсюда (GG.balance). */
   balance: z
     .object({

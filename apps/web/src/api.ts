@@ -34,6 +34,20 @@ export async function postThumb(versionId: string, image: string, token: string)
   }
   return false;
 }
+/** Отправляет итог автоподбора сложности; ответ с factor — версия пересобрана. */
+export async function postTune(versionId: string, report: unknown, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/versions/${versionId}/tune`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ report, token }),
+    });
+    return res.status === 200;
+  } catch {
+    return false;
+  }
+}
+
 let configPromise: Promise<{ publicUrl: string; runtimeVersion: string }> | null = null;
 /** Конфиг не меняется за время жизни страницы: запрашиваем один раз, при ошибке пробуем снова. */
 export const getConfig = () =>

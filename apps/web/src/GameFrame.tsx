@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { STORAGE_MAX_BYTES, STORAGE_MAX_KEYS, parseGameMessage } from "@gg/shared";
-import { getConfig, postThumb } from "./api";
+import { getConfig, postThumb, postTune } from "./api";
 
 /** Каждый статус помнит свою версию, поэтому устаревший статус не применится к другой. */
 export type FrameStatus = { versionId: string } & (
@@ -37,6 +37,9 @@ export function GameFrame({
   onStatus,
   thumbToken = null,
   onThumb,
+  tuneToken = null,
+  tuning,
+  onTuned,
 }: {
   gameId: string;
   versionId: string;
@@ -45,14 +48,21 @@ export function GameFrame({
   /** Есть у автора, пока у версии нет снимка: первый кадр без ошибок уходит на сервер как обложка. */
   thumbToken?: string | null;
   onThumb?: () => void;
+  /** Есть у автора, пока версия не откалибрована: превью подбирает сложность ботами и сохраняет её. */
+  tuneToken?: string | null;
+  /** Множитель уже подобранной сложности: входит в адрес игры, чтобы не взять старый HTML из кэша. */
+  tuning?: number;
+  onTuned?: () => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const runId = useMemo(() => Math.random().toString(36).slice(2, 12), [versionId, reloadKey]);
   const statusRef = useRef(onStatus);
   statusRef.current = onStatus;
-  const thumbRef = useRef({ thumbToken, onThumb, sent: false });
+  const thumbRef = useRef({ thumbToken, onThumb, sent: false, tuneToken, onTuned });
   thumbRef.current.thumbToken = thumbToken;
   thumbRef.current.onThumb = onThumb;
+  thumbRef.current.tuneToken = tuneToken;
+  thumbRef.current.onTuned = onTuned;
   // Версия рантайма в адресе /g: после пересборки браузер не возьмёт старый HTML из кэша.
   const [runtime, setRuntime] = useState<string | null>(null);
   useEffect(() => {
@@ -87,6 +97,14 @@ export function GameFrame({
         postThumb(versionId, m.image, t.thumbToken).then((ok) => {
           if (ok) t.onThumb?.();
         });
+      } else if (m.type === "tune") {
+        const t = thumbRef.current;
+        if (!t.tuneToken) return;
+        const token = t.tuneToken;
+        t.tuneToken = null;
+        postTune(versionId, m.report, token).then((ok) => {
+          if (ok) t.onTuned?.();
+        });
       } else if (m.type === "storage:get") {
         let value: string | null = null;
         try {
@@ -119,7 +137,7 @@ export function GameFrame({
             title="Игра"
       sandbox="allow-scripts"
       allow="autoplay; vibrate"
-      src={`/g/${versionId}${runtime ? `?r=${runtime}` : ""}#run=${runId}${thumbToken ? "&thumb=1" : ""}`}
+      src={`/g/${versionId}${runtime ? `?r=${runtime}${tuning ? `-${tuning}` : ""}` : ""}#run=${runId}${thumbToken ? "&thumb=1" : ""}${tuneToken ? "&tune=1" : ""}`}
     />
   );
 }

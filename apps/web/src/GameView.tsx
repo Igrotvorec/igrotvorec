@@ -181,6 +181,9 @@ export function GameView({ id }: { id: string }) {
                     onStatus={setStatus}
                     thumbToken={version.hasThumb ? null : thumbTokenFor(version.id)}
                     onThumb={() => load(false)}
+                    tuneToken={version.spec.engine === "phaser" && !version.spec.tuning ? thumbTokenFor(version.id) : null}
+                    tuning={version.spec.tuning?.factor}
+                    onTuned={() => load(false)}
                   />
                 </Phone>
                 <StatusLine status={status?.versionId === version.id ? status : null} repairing={repairing} />

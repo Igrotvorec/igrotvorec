@@ -4,9 +4,10 @@ import { RUNTIME_VERSION } from "@gg/runtime";
  * владеет хранилищем (у игры с opaque origin нет localStorage) и отправляет телеметрию.
  */
 /** og-теги: ссылка на игру в Telegram или VK показывается карточкой с названием, правилами и кадром. */
-export function playShell(opts: { title: string; versionId: string; background: string; description: string; url: string; image: string | null }): string {
+export function playShell(opts: { title: string; versionId: string; background: string; description: string; url: string; image: string | null; tuning?: number }): string {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-  const data = JSON.stringify({ versionId: opts.versionId, runtime: RUNTIME_VERSION }).replace(/</g, "\\u003c");
+  // Множитель автоподбора входит в адрес /g: после калибровки браузер не возьмёт старый HTML из кэша.
+  const data = JSON.stringify({ versionId: opts.versionId, runtime: RUNTIME_VERSION + (opts.tuning ? "-" + opts.tuning : "") }).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="ru">
 <head>

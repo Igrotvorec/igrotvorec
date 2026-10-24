@@ -13,7 +13,8 @@ export type GameToShell =
   | { gg: 1; runId: string; type: "state"; state: "start" | "playing" | "won" | "lost"; score?: number; activeMs?: number }
   | { gg: 1; runId: string; type: "storage:get"; reqId: number; key: string }
   | { gg: 1; runId: string; type: "storage:set"; key: string; value: string }
-  | { gg: 1; runId: string; type: "thumb"; image: string };
+  | { gg: 1; runId: string; type: "thumb"; image: string }
+  | { gg: 1; runId: string; type: "tune"; report: TuneReport | null };
 
 export type ShellToGame =
   | { gg: 1; type: "storage:value"; reqId: number; value: string | null }
@@ -21,11 +22,24 @@ export type ShellToGame =
   | { gg: 1; type: "resume" };
 
 export const MAX_STORAGE_VALUE = 2048;
+
+/** Итог автоподбора сложности ботами (phaser-kit.js, tuneDifficulty). */
+export interface TuneReport {
+  /** Множитель GG.speed, при котором баланс попал в цель. */
+  factor: number;
+  goodMs: number;
+  carelessWins: number;
+  carelessMs: number;
+  randomWon: boolean;
+  tried: number;
+  ms: number;
+}
+const TUNE_FACTORS = [0.6, 0.75, 0.9, 1, 1.15, 1.35, 1.6, 1.9];
 /** Снимок стартовой сцены 270×480 JPEG; с запасом, сервер всё равно перекодирует. */
 export const MAX_THUMB_CHARS = 300_000;
 const THUMB_PREFIX = "data:image/jpeg;base64,";
 
-const GAME_TYPES = new Set(["boot", "ready", "frame", "input", "error", "state", "storage:get", "storage:set", "thumb"]);
+const GAME_TYPES = new Set(["boot", "ready", "frame", "input", "error", "state", "storage:get", "storage:set", "thumb", "tune"]);
 
 /** Проверяет форму недоверенного сообщения от игры и обрезает поля до безопасной длины. */
 export function parseGameMessage(data: unknown, runId: string): GameToShell | null {
@@ -60,6 +74,24 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
     case "storage:set": {
       if (typeof m.key !== "string" || m.key.length > 64 || typeof m.value !== "string" || m.value.length > MAX_STORAGE_VALUE) return null;
       return { gg: 1, runId, type: "storage:set", key: m.key, value: m.value };
+    }
+    case "tune": {
+      if (m.report === null) return { gg: 1, runId, type: "tune", report: null };
+      const r = m.report as Record<string, unknown> | undefined;
+      if (!r || typeof r !== "object" || Array.isArray(r)) return null;
+      const n = (v: unknown, max: number) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= max ? v : null);
+      const factor = n(r.factor, 2);
+      if (factor === null || !TUNE_FACTORS.includes(factor)) return null;
+      const report: TuneReport = {
+        factor,
+        goodMs: n(r.goodMs, 600_000) ?? 0,
+        carelessWins: n(r.carelessWins, 3) ?? 0,
+        carelessMs: n(r.carelessMs, 600_000) ?? 0,
+        randomWon: r.randomWon === true,
+        tried: n(r.tried, 10) ?? 0,
+        ms: n(r.ms, 600_000) ?? 0,
+      };
+      return { gg: 1, runId, type: "tune", report };
     }
     case "thumb": {
       if (typeof m.image !== "string" || m.image.length > MAX_THUMB_CHARS || !m.image.startsWith(THUMB_PREFIX)) return null;

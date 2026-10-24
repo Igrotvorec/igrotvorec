@@ -195,6 +195,23 @@ export function recoverThumbClaims() {
   db.exec("UPDATE versions SET has_thumb = 0 WHERE has_thumb = 2");
 }
 
+/**
+ * Записывает итог автоподбора сложности в спеку версии, один раз. Это калибровка той же версии,
+ * а не новая версия: код не меняется, меняется множитель скорости в конфиге рантайма.
+ */
+export function saveTuning(versionId: string, tuning: NonNullable<GameSpec["tuning"]>): boolean {
+  const tx = db.transaction(() => {
+    const row = db.query("SELECT spec FROM versions WHERE id = ?").get(versionId) as { spec: string } | null;
+    if (!row) return false;
+    const spec = JSON.parse(row.spec) as GameSpec;
+    if (spec.engine !== "phaser" || spec.tuning) return false;
+    spec.tuning = tuning;
+    db.query("UPDATE versions SET spec = ? WHERE id = ?").run(JSON.stringify(spec), versionId);
+    return true;
+  });
+  return tx();
+}
+
 /** Версии ещё нужен снимок (дешёвая проверка до декодирования картинки). */
 export function needsThumb(versionId: string): boolean {
   const row = db.query("SELECT has_thumb FROM versions WHERE id = ?").get(versionId) as { has_thumb: number } | null;

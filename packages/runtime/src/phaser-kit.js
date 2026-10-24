@@ -13,9 +13,15 @@
   var runId = (location.hash.match(/run=([\w-]+)/) || [])[1] || "";
   var hasParent = window.parent && window.parent !== window;
   var wantThumb = /[#&]thumb=1/.test(location.hash);
+  /** Превью автора просит подобрать сложность ботами (#…&tune=1). */
+  var wantTune = /[#&]tune=1/.test(location.hash);
+  /** Симуляция баланса: время виртуальное, без звука, эффектов, телеметрии и экранов. */
+  var sim = false;
+  var simNow = 0;
+  function clock() { return sim ? simNow : Date.now(); }
 
   function post(msg) {
-    if (!hasParent) return;
+    if (!hasParent || (sim && msg.type !== "error")) return;
     msg.gg = 1;
     msg.runId = runId;
     try {
@@ -113,7 +119,7 @@
     return audio;
   }
   function tone(freq, dur, type, vol, slideTo, when) {
-    if (muted || !audio || audio.state !== "running") return;
+    if (muted || sim || !audio || audio.state !== "running") return;
     var t = when || audio.currentTime;
     var o = audio.createOscillator();
     var g = audio.createGain();
@@ -128,7 +134,7 @@
     o.stop(t + dur + 0.02);
   }
   function noise(dur, vol, when) {
-    if (muted || !audio || audio.state !== "running") return;
+    if (muted || sim || !audio || audio.state !== "running") return;
     var t = when || audio.currentTime;
     var len = Math.floor(audio.sampleRate * dur);
     var buf = audio.createBuffer(1, len, audio.sampleRate);
@@ -283,7 +289,8 @@
   var score = 0;
   var best = 0;
   var activeMs = 0;
-  var playStartedAt = 0;
+  /** Начало текущего отрезка игры; null — не играем (0 — законное время на виртуальных часах). */
+  var playStartedAt = null;
   /** Жизни, прощение первой ошибки и цель раунда ведёт рантайм: модель путала их порядок с разминкой. */
   var lives = 3;
   var forgiven = false;
@@ -291,21 +298,22 @@
   var softAt = 0;
   var goalMovedAt = 0;
   /** Раунд без таймера не должен длиться вечно: если цель не двигается 30 с после разминки — поражение. */
-  setInterval(function () {
+  function stallCheck() {
     if (state !== "playing" || !goal || GG.inWarmup()) return;
     var warm = ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000;
     if (roundMs() - Math.max(goalMovedAt, warm) > 30000) finish(false, "Цель не сдвинулась 30 секунд");
-  }, 1000);
+  }
+  setInterval(function () { if (!sim) stallCheck(); }, 1000);
   var invulnerableUntil = 0;
   var goal = null;
   function roundMs() {
-    return activeMs + (state === "playing" && playStartedAt ? Date.now() - playStartedAt : 0);
+    return activeMs + (state === "playing" && playStartedAt !== null ? clock() - playStartedAt : 0);
   }
 
   function setState(s) {
-    if (state === "playing" && playStartedAt) activeMs += Date.now() - playStartedAt;
+    if (state === "playing" && playStartedAt !== null) activeMs += clock() - playStartedAt;
     state = s;
-    playStartedAt = s === "playing" ? Date.now() : 0;
+    playStartedAt = s === "playing" ? clock() : null;
     post({ type: "state", state: s, score: score, activeMs: activeMs });
   }
   function gameScene() {
@@ -330,8 +338,14 @@
     startMusic();
   }
   var newRecord = false;
+  var simResult = null;
   function finish(won, message) {
     if (state !== "playing") return;
+    if (sim) {
+      simResult = { won: won, ms: roundMs() };
+      state = won ? "won" : "lost";
+      return;
+    }
     newRecord = score > best;
     best = Math.max(best, score);
     storage.set("best", String(best));
@@ -550,7 +564,7 @@
     /** Разлёт искр: попадание, сбор, взрыв (мировые координаты события). */
     burst: function (x, y, color, count, screen) {
       var sc = sceneNow();
-      if (!sc) return;
+      if (!sc || sim) return;
       var n = Math.min(count || 18, 60);
       var dark = darkBg();
       var em = sc.add
@@ -562,7 +576,7 @@
     /** Всплывающий текст «+10» над местом события. */
     float: function (x, y, text, color, screen) {
       var sc = sceneNow();
-      if (!sc) return;
+      if (!sc || sim) return;
       if (!screen) y = fxY(y);
       var t = sc.add
         .text(x, y, String(text), { fontFamily: GG.font, fontSize: Math.round(46 * Math.min(cfg.uiScale, 1.4)) + "px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 8 })
@@ -583,11 +597,12 @@
       if (obj.body) obj.body.enable = false;
       if (obj.disableInteractive) obj.disableInteractive();
       obj.setActive(false);
+      recentHits.push({ x: obj.x, y: obj.y, t: clock() });
+      if (sim) return void obj.destroy();
       if (obj.__ggTween) obj.__ggTween.stop();
       sc.tweens.add({ targets: obj, scaleX: obj.scaleX * 1.35, scaleY: obj.scaleY * 1.35, angle: (obj.angle || 0) + window.Phaser.Math.Between(-200, 200), alpha: 0, y: obj.y - 60, duration: 320, ease: "Quad.Out", onComplete: function () { obj.destroy(); } });
-      recentHits.push({ x: obj.x, y: obj.y, t: Date.now() });
       if (recentHits.length > 20) recentHits.shift();
-      var now = Date.now();
+      var now = clock();
       if (now > hitstopUntil + 150 && state === "playing") {
         hitstopUntil = now + 60;
         hitstopActive = true;
@@ -615,15 +630,15 @@
     /** Тряска камеры: light — касание, medium — урон, heavy — взрыв. */
     shake: function (level) {
       var sc = sceneNow();
-      if (!sc) return;
+      if (!sc || sim) return;
       var k = level === "heavy" ? [260, 0.02] : level === "medium" ? [170, 0.011] : [90, 0.005];
       sc.cameras.main.shake(k[0], calmAudience ? k[1] * 0.5 : k[1]);
     },
     /** Вспышка экрана для больших событий: не дольше 150 мс и не чаще раза в 3 с; для детей и пожилых — мягкий пульс. */
     flash: function (color) {
       var sc = sceneNow();
-      var now = Date.now();
-      if (!sc || now - lastFlash < 3000) return;
+      var now = clock();
+      if (!sc || sim || now - lastFlash < 3000) return;
       lastFlash = now;
       var c = window.Phaser.Display.Color.IntegerToColor(tintOf(color || "#ffffff"));
       if (!calmAudience) return sc.cameras.main.flash(140, c.red, c.green, c.blue);
@@ -633,7 +648,7 @@
     /** Баннер «Уровень 2!»: в экранных координатах поверх полосы HUD (игровое поле не закрывает), около секунды. */
     banner: function (text, color) {
       var sc = sceneNow();
-      if (!sc) return;
+      if (!sc || sim) return;
       var y = TOP / 2;
       var bg = sc.add.rectangle(W / 2, y, W, TOP, 0x111318, 1).setDepth(150).setScrollFactor(0);
       var t = sc.add
@@ -652,7 +667,7 @@
     /** Появление объекта: вырастает из нуля до своего размера (вызывать после setDisplaySize). */
     pop: function (obj) {
       var sc = sceneNow();
-      if (!sc || !obj) return obj;
+      if (!sc || !obj || sim) return obj;
       var b = fxBase(obj);
       obj.setScale(0);
       obj.__ggTween = sc.tweens.add({ targets: obj, scaleX: b.x, scaleY: b.y, duration: 240, ease: "Back.Out", onComplete: function () { obj.setScale(b.x, b.y); } });
@@ -661,7 +676,7 @@
     /** Сплющивание при приземлении или поимке; повторные вызовы не накапливают масштаб. */
     squash: function (obj) {
       var sc = sceneNow();
-      if (!sc || !obj || !obj.active) return;
+      if (!sc || !obj || !obj.active || sim) return;
       var b = fxBase(obj);
       // Тело физики растёт вместе с масштабом: у физических объектов сплющивание мягче, чтобы окно ловли не прыгало.
       var sx = obj.body ? 1.08 : 1.25, sy = obj.body ? 0.93 : 0.78;
@@ -696,6 +711,155 @@
     return obj;
   }
 
+  // ---------- ввод ботов: настоящие события мыши на канвасе, игра обрабатывает их как касания ----------
+  var botHeld = false;
+  function botEvent(type, x, y) {
+    if (!game || !game.canvas) return;
+    var r = game.canvas.getBoundingClientRect();
+    var cx = r.left + (x / W) * r.width, cy = r.top + (y / H) * r.height;
+    var ev = new MouseEvent(type, { clientX: cx, clientY: cy, button: 0, buttons: type === "mouseup" ? 0 : 1, bubbles: true, cancelable: true });
+    game.canvas.dispatchEvent(ev);
+  }
+  var bot = {
+    tap: function (x, y) { botEvent("mousedown", x, y); botEvent("mouseup", x, y); botHeld = false; },
+    down: function (x, y) { botEvent("mousedown", x, y); botHeld = true; },
+    move: function (x, y) { botEvent("mousemove", x, y); },
+    up: function (x, y) { botEvent("mouseup", x == null ? W / 2 : x, y == null ? H / 2 : y); botHeld = false; },
+  };
+
+  // ---------- автоподбор сложности: раунды ботами на виртуальном времени без отрисовки ----------
+  var STEP = 1000 / 60;
+  /** Множители скорости, которые пробует подбор (тот же список проверяет сервер). */
+  var TUNE_LADDER = [0.6, 0.75, 0.9, 1, 1.15, 1.35, 1.6, 1.9];
+  /** «Наугад»: каждые 0,4–1 с касание или протяжка в случайную точку игрового поля. */
+  function randomBot() {
+    var next = 0, dragTo = null;
+    return function () {
+      if (simNow < next) {
+        if (dragTo && botHeld) bot.move(dragTo.x, dragTo.y);
+        return;
+      }
+      next = simNow + 400 + Math.random() * 600;
+      var x = 40 + Math.random() * (W - 80), y = TOP + 40 + Math.random() * (H - TOP - 80);
+      if (Math.random() < 0.5) {
+        if (botHeld) bot.up(x, y);
+        bot.tap(x, y);
+        dragTo = null;
+      } else {
+        if (!botHeld) bot.down(x, y);
+        dragTo = { x: 40 + Math.random() * (W - 80), y: TOP + 40 + Math.random() * (H - TOP - 80) };
+      }
+    };
+  }
+  /** Один раунд: kind — idle | random | число (навык бота игры от 0 до 1). */
+  function simRound(kind, maxMs) {
+    var sc = gameScene();
+    score = 0;
+    activeMs = 0;
+    lives = (cfg.balance && cfg.balance.lives) || 3;
+    forgiven = false;
+    softMistakes = 0;
+    softAt = 0;
+    goalMovedAt = 0;
+    invulnerableUntil = 0;
+    goal = null;
+    recentHits = [];
+    simResult = null;
+    if (botHeld) bot.up();
+    sc.scene.restart();
+    simNow = 0;
+    state = "playing";
+    playStartedAt = simNow;
+    var act = kind === "random" ? randomBot() : null;
+    var steps = 0;
+    while (state === "playing" && simNow < maxMs) {
+      game.headlessStep(simNow, STEP);
+      simNow += STEP;
+      steps++;
+      if (failed) return null;
+      var live = gameScene();
+      if (kind === "random") act();
+      else if (typeof kind === "number" && live && typeof live.bot === "function") {
+        try {
+          live.bot(kind, STEP);
+        } catch (e) {
+          reportError(e, "bot");
+          return null;
+        }
+      }
+      if (steps % 60 === 0) stallCheck();
+    }
+    if (botHeld) bot.up();
+    return simResult || { won: false, ms: roundMs(), timeout: true };
+  }
+
+  /**
+   * Подбирает множитель скорости игры (GG.speed) так, чтобы небрежный игрок выигрывал примерно в
+   * половине раундов (у детей и пожилых — чаще), хороший выигрывал, а «наугад» — нет. Игра должна
+   * реализовать метод bot(skill, dtMs). Возвращает отчёт или null, если подбор невозможен.
+   */
+  function tuneDifficulty() {
+    var sc = gameScene();
+    if (!sc || typeof sc.bot !== "function" || typeof game.headlessStep !== "function") return null;
+    var base = cfg.speed;
+    var calm = calmAudience;
+    var limit = ((cfg.balance && cfg.balance.timeLimitSec) || 0) > 0 ? cfg.balance.timeLimitSec * 1000 + 2000 : 150000;
+    var started = Date.now();
+    var BUDGET_MS = 25000;
+    var ladder = TUNE_LADDER;
+    var idx = ladder.indexOf(1);
+    var tried = {};
+    var chosen = null;
+    game.loop.sleep();
+    sim = true;
+    try {
+      for (var attempt = 0; attempt < 5; attempt++) {
+        var f = ladder[idx];
+        cfg.speed = base * f;
+        var good = simRound(1, limit);
+        var careless = [simRound(0.5, limit), simRound(0.5, limit), simRound(0.5, limit)];
+        var random = simRound("random", limit);
+        if (!good || !careless[0] || !careless[1] || !careless[2] || !random) return null;
+        var cWins = careless.filter(function (c) { return c.won; }).length;
+        var r = { idx: idx, factor: f, goodWon: good.won, goodMs: Math.round(good.ms), carelessWins: cWins, carelessMs: Math.round((careless[0].ms + careless[1].ms + careless[2].ms) / 3), randomWon: random.won };
+        // Цель: хороший выигрывает, наугад проигрывает; небрежный 1-2 из 3 (дети и пожилые: 2-3 из 3).
+        r.tooHard = !good.won || cWins < (calm ? 2 : 1);
+        r.tooEasy = random.won || (!calm && cWins === 3);
+        tried[idx] = r;
+        if (!r.tooHard && !r.tooEasy) {
+          chosen = r;
+          break;
+        }
+        var next = r.tooHard ? idx - 1 : idx + 1;
+        if (next < 0 || next >= ladder.length || tried[next] || Date.now() - started > BUDGET_MS) break;
+        idx = next;
+      }
+      if (!chosen) {
+        // Точно в цель не попали: ближайший по направлению вариант, где хороший игрок ещё выигрывает.
+        var list = Object.keys(tried).map(function (k) { return tried[k]; }).filter(function (t) { return t.goodWon; });
+        list.sort(function (a, b) { return (a.tooEasy ? 1 : 0) - (b.tooEasy ? 1 : 0) || b.factor - a.factor; });
+        chosen = list[0] || null;
+      }
+      return chosen ? { factor: chosen.factor, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
+    } catch (e) {
+      reportError(e, "tune");
+      return null;
+    } finally {
+      sim = false;
+      cfg.speed = base;
+      state = "start";
+      score = 0;
+      goal = null;
+      playStartedAt = null;
+      game.loop.wake();
+      var live = gameScene();
+      if (live) {
+        live.scene.restart();
+        live.scene.pause();
+      }
+    }
+  }
+
   // ---------- публичный API для кода игры ----------
   var GG = {
     W: W,
@@ -715,13 +879,20 @@
     sfx: function (name) {
       if (name === "win" || name === "lose") return; // их играет рантайм в finish
       var f = SFX[name];
-      var now = Date.now();
+      var now = clock();
       if (!f || now - (sfxLast[name] || 0) < (name === "shoot" ? 300 : 50)) return;
       sfxLast[name] = now;
       f();
     },
     fx: fx,
     hitbox: hitbox,
+    /** Ввод для метода bot(skill): касание, нажатие, перемещение с зажатым пальцем, отпускание (координаты игры). */
+    botTap: function (x, y) { bot.tap(x, y); },
+    botDown: function (x, y) { bot.down(x, y); },
+    botMove: function (x, y) { bot.move(x, y); },
+    botUp: function (x, y) { bot.up(x, y); },
+    /** Идёт автоподбор сложности (время виртуальное, экрана не видно). */
+    get simulating() { return sim; },
     /** Нижняя граница HUD (y): игровые объекты появляются и поражаются только ниже. */
     top: TOP,
     /** Числа баланса из спеки: используйте их, а не свои. */
@@ -734,7 +905,7 @@
      */
     damage: function (reason, opts) {
       if (state !== "playing") return "invulnerable";
-      var now = Date.now();
+      var now = clock();
       if (GG.inWarmup()) return "warmup";
       if (now < invulnerableUntil) return "invulnerable";
       // Мягкая ошибка (тап мимо, неточность): три мягких = одна настоящая; каждые 3 с одна забывается.
@@ -755,7 +926,7 @@
       lives = Math.max(0, lives - 1);
       fx.shake("medium");
       SFX.hit();
-      vibrate(80);
+      if (!sim) vibrate(80);
       if (lives === 0) {
         finish(false, "Жизни закончились");
         return "dead";
@@ -772,7 +943,7 @@
     },
     /** Был ли рядом недавний GG.fx.hit: тап по только что сбитому объекту не считается промахом. */
     recentlyHit: function (x, y, r, ms) {
-      var now = Date.now();
+      var now = clock();
       r = r || 120;
       ms = ms || 500;
       for (var i = recentHits.length - 1; i >= 0; i--) {
@@ -877,6 +1048,19 @@
             post({ type: "ready" });
             showOverlay("start");
             setTimeout(postThumb, 100);
+            if (wantTune) {
+              // После снимка: подбор останавливает цикл игры на несколько секунд.
+              setTimeout(function () {
+                if (state !== "start") return;
+                var btn = overlay.querySelector(".gg-btn");
+                if (btn) { btn.disabled = true; btn.textContent = "Подбираю сложность…"; }
+                setTimeout(function () {
+                  var report = tuneDifficulty();
+                  post({ type: "tune", report: report });
+                  if (btn) { btn.disabled = false; btn.textContent = "Играть"; }
+                }, 30);
+              }, 1500);
+            }
           }
         });
       });
