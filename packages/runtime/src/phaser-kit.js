@@ -732,9 +732,13 @@
 
   // ---------- ввод ботов: настоящие события мыши на канвасе, игра обрабатывает их как касания ----------
   var botHeld = false;
+  /** Последняя точка пальца бота: отпускание без координат — там же, иначе свайп превращается в рывок к центру. */
+  var botX = W / 2, botY = H / 2;
   function botEvent(type, x, y) {
     if (!game || !game.canvas) return;
     var r = game.canvas.getBoundingClientRect();
+    botX = x;
+    botY = y;
     var cx = r.left + (x / W) * r.width, cy = r.top + (y / H) * r.height;
     var ev = new MouseEvent(type, { clientX: cx, clientY: cy, button: 0, buttons: type === "mouseup" ? 0 : 1, bubbles: true, cancelable: true });
     game.canvas.dispatchEvent(ev);
@@ -743,7 +747,7 @@
     tap: function (x, y) { botEvent("mousedown", x, y); botEvent("mouseup", x, y); botHeld = false; },
     down: function (x, y) { botEvent("mousedown", x, y); botHeld = true; },
     move: function (x, y) { botEvent("mousemove", x, y); },
-    up: function (x, y) { botEvent("mouseup", x == null ? W / 2 : x, y == null ? H / 2 : y); botHeld = false; },
+    up: function (x, y) { botEvent("mouseup", x == null ? botX : x, y == null ? botY : y); botHeld = false; },
   };
 
   // ---------- автоподбор сложности: раунды ботами на виртуальном времени без отрисовки ----------
@@ -854,7 +858,8 @@
         var careless = [];
         for (var c = 0; c < 8; c++) careless.push(simRound(0.5, lim));
         var randoms = [simRound("random", lim), simRound("random", lim), simRound("random", lim)];
-        var all = goods.concat(careless, randoms);
+        var idle = simRound("idle", lim);
+        var all = goods.concat(careless, randoms, [idle]);
         for (var a = 0; a < all.length; a++) if (!all[a]) return null;
         var gWins = goods.filter(function (g) { return g.won; }).length;
         var cWins = careless.filter(function (g) { return g.won; }).length;
@@ -863,7 +868,8 @@
         var r = { idx: idx, factor: f, lives: lives0, timeLimitSec: timeLimit0, goodWon: gWins > 0, goodMs: Math.round(goods[0].ms), carelessWins: cWins, carelessMs: Math.round(careless.reduce(function (s, g) { return s + g.ms; }, 0) / careless.length), randomWon: rWins > 0 };
         // Цель: хороший выигрывает, наугад нет; небрежный выигрывает 3-5 из 8 (дети и пожилые 5-8 из 8).
         r.tooHard = gWins === 0 || cWins < (calm ? 5 : 3);
-        r.tooEasy = rWins > 0 || (!calm && cWins > 5);
+        r.idleWon = !!idle.won;
+        r.tooEasy = rWins > 0 || idle.won || (!calm && cWins > 5);
         // Цель собирается в разминке: ускорение тут не помогает, нужна правка самой игры.
         r.warmupLeak = goods.some(function (g) { return g.warmFrac > 0.3; });
         // Небрежный проигрывает по таймеру, а не по ошибкам — помогает только больше времени.
@@ -891,6 +897,12 @@
         }
         if (next < 0 || next >= ladder.length || tried[next + ":" + lives0 + ":" + timeLimit0]) break;
         idx = next;
+      }
+      // Бот игры сломан (хороший не выигрывает нигде или проигрывает там, где бездействие выигрывает):
+      // результат подбора ничего не говорит о сложности, оставляем исходные числа.
+      var triedList = Object.keys(tried).map(function (k) { return tried[k]; });
+      if (!triedList.some(function (t) { return t.goodWon; }) || triedList.some(function (t) { return t.idleWon && !t.goodWon; })) {
+        return { skipped: true, reason: "bot", factor: 1, lives: baseLives, timeLimitSec: baseTime, goodMs: 0, carelessWins: 0, carelessMs: 0, randomWon: false, tried: triedList.length, ms: Date.now() - started };
       }
       if (!chosen) {
         // Точно в цель не попали. Если есть не слишком сложные варианты — самый сложный из них;

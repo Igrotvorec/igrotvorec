@@ -219,7 +219,7 @@ app.post("/api/versions/:versionId/tune", bodyLimit({ maxSize: 4096, onError: (c
   if (!thumbTokenValid(id, body.data.token)) return c.body(null, 403);
   const msg = parseGameMessage({ gg: 1, runId: "x", type: "tune", report: body.data.report }, "x");
   if (!msg || msg.type !== "tune") return c.body(null, 400);
-  const tuning = msg.report ? { ...msg.report, skipped: false } : { factor: 1, skipped: true };
+  const tuning = msg.report && !msg.report.skipped ? { ...msg.report, skipped: false } : { factor: 1, skipped: true };
   if (!saveTuning(id, tuning)) return c.body(null, 204);
   const html = rebuildHtml(id);
   if (html) await writeAtomic(gamePath(id), html);

@@ -28,6 +28,8 @@ export interface TuneReport {
   /** Подбор не попал в цель (край лестницы, наугад выигрывает, цель набирается в разминке). */
   failed: boolean;
   warmupLeak: boolean;
+  /** Бот игры не годится для оценки (хороший не выигрывает): параметры не меняются. */
+  skipped?: boolean;
   /** Множитель GG.speed, при котором баланс попал в цель. */
   factor: number;
   /** Жизни после подбора (вторая ручка, когда скорость упёрлась в край). */
@@ -91,6 +93,7 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
       if (factor === null || !TUNE_FACTORS.includes(factor)) return null;
       const report: TuneReport = {
         failed: r.failed === true,
+        ...(r.skipped === true ? { skipped: true } : {}),
         warmupLeak: r.warmupLeak === true,
         factor,
         lives: Math.round(n(r.lives, 9) ?? 3) || 3,
