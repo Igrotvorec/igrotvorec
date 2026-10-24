@@ -56,6 +56,8 @@ export const GameSpecSchema = z.object({
   tuning: z
     .object({
       factor: z.number(),
+      failed: z.boolean().optional(),
+      warmupLeak: z.boolean().optional(),
       lives: z.number().optional(),
       timeLimitSec: z.number().optional(),
       goodMs: z.number().optional(),

@@ -58,6 +58,8 @@ export interface PhaserKitConfig extends KitConfig {
   background: string | null;
   /** Настроение фоновой музыки: happy | calm | tense; пусто — без музыки. */
   music?: string;
+  /** Множитель скорости из автоподбора: разминка считается в игровом времени. */
+  speedFactor?: number;
   /** Числа баланса из спеки (GG.balance). */
   balance?: { warmupSec: number; lives: number; cleanRunSec: number; timeLimitSec: number; spawnPerSec: number };
 }

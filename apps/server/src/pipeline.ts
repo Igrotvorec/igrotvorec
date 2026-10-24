@@ -62,7 +62,7 @@ export function assembleVersion(spec: GameSpec, assets: SpriteMap, code: string)
   const speed = base.speed * (spec.tuning?.factor ?? 1);
   const t = spec.tuning;
   const balance = spec.balance && t && !t.skipped ? { ...spec.balance, lives: t.lives ?? spec.balance.lives, timeLimitSec: t.timeLimitSec ?? spec.balance.timeLimitSec } : spec.balance;
-  return assemblePhaserGame({ ...base, speed, background: assets.bg ?? null, music: spec.music, balance }, code, spec.language);
+  return assemblePhaserGame({ ...base, speed, speedFactor: spec.tuning?.factor ?? 1, background: assets.bg ?? null, music: spec.music, balance }, code, spec.language);
 }
 
 /**

@@ -25,6 +25,9 @@ export const MAX_STORAGE_VALUE = 2048;
 
 /** Итог автоподбора сложности ботами (phaser-kit.js, tuneDifficulty). */
 export interface TuneReport {
+  /** Подбор не попал в цель (край лестницы, наугад выигрывает, цель набирается в разминке). */
+  failed: boolean;
+  warmupLeak: boolean;
   /** Множитель GG.speed, при котором баланс попал в цель. */
   factor: number;
   /** Жизни после подбора (вторая ручка, когда скорость упёрлась в край). */
@@ -87,6 +90,8 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
       const factor = n(r.factor, 2);
       if (factor === null || !TUNE_FACTORS.includes(factor)) return null;
       const report: TuneReport = {
+        failed: r.failed === true,
+        warmupLeak: r.warmupLeak === true,
         factor,
         lives: Math.round(n(r.lives, 9) ?? 3) || 3,
         timeLimitSec: Math.round(n(r.timeLimitSec, 600) ?? 0),

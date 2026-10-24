@@ -17,6 +17,11 @@
   var wantTune = /[#&]tune=1/.test(location.hash);
   /** Симуляция баланса: время виртуальное, без звука, эффектов, телеметрии и экранов. */
   var sim = false;
+  /**
+   * Во сколько раз подбор ускорил игру. Игры двигают мир на dt × GG.speed, поэтому разминка считается
+   * в игровом времени: иначе при ускорении в неё влезает больше прогресса и игра становится легче.
+   */
+  var speedFactor = 1;
   var simNow = 0;
   function clock() { return sim ? simNow : Date.now(); }
 
@@ -300,7 +305,7 @@
   /** Раунд без таймера не должен длиться вечно: если цель не двигается 30 с после разминки — поражение. */
   function stallCheck() {
     if (state !== "playing" || !goal || GG.inWarmup()) return;
-    var warm = ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000;
+    var warm = ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000 / speedFactor;
     if (roundMs() - Math.max(goalMovedAt, warm) > 30000) finish(false, "Цель не сдвинулась 30 секунд");
   }
   setInterval(function () { if (!sim) stallCheck(); }, 1000);
@@ -786,6 +791,7 @@
     playStartedAt = simNow;
     var act = kind === "random" ? randomBot() : null;
     var steps = 0;
+    var warmFrac = null;
     while (state === "playing" && simNow < maxMs) {
       game.headlessStep(simNow, STEP);
       simNow += STEP;
@@ -802,9 +808,13 @@
         }
       }
       if (steps % 60 === 0) stallCheck();
+      if (warmFrac === null && !GG.inWarmup()) warmFrac = goal ? goal.done / goal.total : 0;
     }
+    if (warmFrac === null) warmFrac = goal ? goal.done / goal.total : 0;
     if (botHeld) bot.up();
-    return simResult || { won: false, ms: roundMs(), timeout: true };
+    var res = simResult || { won: false, ms: roundMs(), timeout: true };
+    res.warmFrac = warmFrac;
+    return res;
   }
 
   /**
@@ -816,6 +826,7 @@
     var sc = gameScene();
     if (!sc || typeof sc.bot !== "function" || typeof game.headlessStep !== "function") return null;
     var base = cfg.speed;
+    var baseFactor = speedFactor;
     var baseLives = (cfg.balance && cfg.balance.lives) || 3;
     var lives0 = baseLives;
     var baseTime = (cfg.balance && cfg.balance.timeLimitSec) || 0;
@@ -834,6 +845,7 @@
       for (var attempt = 0; attempt < 10; attempt++) {
         var f = ladder[idx];
         cfg.speed = base * f;
+        speedFactor = baseFactor * f;
         if (cfg.balance) cfg.balance.lives = lives0;
         if (cfg.balance && timeLimit0) cfg.balance.timeLimitSec = timeLimit0;
         var lim = timeLimit0 ? timeLimit0 * 1000 + 2000 : limit;
@@ -852,6 +864,8 @@
         // Цель: хороший выигрывает, наугад нет; небрежный выигрывает 3-5 из 8 (дети и пожилые 5-8 из 8).
         r.tooHard = gWins === 0 || cWins < (calm ? 5 : 3);
         r.tooEasy = rWins > 0 || (!calm && cWins > 5);
+        // Цель собирается в разминке: ускорение тут не помогает, нужна правка самой игры.
+        r.warmupLeak = goods.some(function (g) { return g.warmFrac > 0.3; });
         // Небрежный проигрывает по таймеру, а не по ошибкам — помогает только больше времени.
         r.timerBound = r.tooHard && timeLimit0 && cTimeouts >= (8 - cWins) / 2;
         tried[idx + ":" + lives0 + ":" + timeLimit0] = r;
@@ -875,7 +889,7 @@
           lives0 = Math.max(2, lives0 - 1);
           continue;
         }
-        if (next < 0 || next >= ladder.length || tried[next]) break;
+        if (next < 0 || next >= ladder.length || tried[next + ":" + lives0 + ":" + timeLimit0]) break;
         idx = next;
       }
       if (!chosen) {
@@ -887,13 +901,16 @@
         else list.sort(function (a, b) { return a.factor - b.factor || b.lives - a.lives; });
         chosen = (easier.length ? easier : list)[0] || null;
       }
-      return chosen ? { factor: chosen.factor, lives: chosen.lives, timeLimitSec: chosen.timeLimitSec, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
+      // Подбор не справился: упёрлись в край и баланс всё ещё не в цели, наугад выигрывает или цель набирается в разминке.
+      var failedTune = !!chosen && (chosen.tooEasy || chosen.tooHard || chosen.randomWon || chosen.warmupLeak);
+      return chosen ? { failed: failedTune, warmupLeak: !!chosen.warmupLeak, factor: chosen.factor, lives: chosen.lives, timeLimitSec: chosen.timeLimitSec, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
     } catch (e) {
       reportError(e, "tune");
       return null;
     } finally {
       sim = false;
       cfg.speed = base;
+      speedFactor = baseFactor;
       if (cfg.balance) {
         cfg.balance.lives = baseLives;
         cfg.balance.timeLimitSec = baseTime;
@@ -985,7 +1002,7 @@
       return "hit";
     },
     /** Идёт разминка: ошибки не считаются, опасности не появляются. */
-    inWarmup: function () { return state === "playing" && roundMs() < ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000; },
+    inWarmup: function () { return state === "playing" && roundMs() * speedFactor < ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000; },
     /** Прогресс цели для HUD и финальной карточки: GG.setGoal(12, 24, 'Фрукты'). */
     setGoal: function (done, total, label) {
       var d = Math.max(0, done | 0);
@@ -1016,6 +1033,7 @@
   window.__GG = {
     init: function (config) {
       cfg = config || {};
+      speedFactor = cfg.speedFactor || 1;
       cfg.palette = cfg.palette || { background: "#10131a", primary: "#ffcc00", accent: "#ff4d6d", text: "#ffffff" };
       cfg.uiScale = cfg.uiScale || 1;
       cfg.speed = cfg.speed || 1;
