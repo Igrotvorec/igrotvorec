@@ -635,7 +635,7 @@
       var sc = sceneNow();
       if (!sc) return;
       var y = TOP / 2;
-      var bg = sc.add.rectangle(W / 2, y, W, TOP, 0x111318, 0.97).setDepth(150).setScrollFactor(0);
+      var bg = sc.add.rectangle(W / 2, y, W, TOP, 0x111318, 1).setDepth(150).setScrollFactor(0);
       var t = sc.add
         .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "60px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 10 })
         .setOrigin(0.5)
