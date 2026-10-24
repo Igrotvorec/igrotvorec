@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "checked": "2026-10-24",
+  "note": "Same format as genre-recipes.json; use its conventions block. Levels switch on goal progress (1/3 and 2/3) to match the hard rules of prompts-phaser.ts. Source keys are defined in genre-recipes-sources.md and genre-recipes-extra-sources.md.",
+  "genres": [
+    {
+      "id": "hidden-object",
+      "genre": "puzzle",
+      "name_ru": "Поиск предметов",
+      "coreLoop": "A cluttered scene hides the items shown in a list at the bottom; tap each one to find it before time runs out.",
+      "controls": "Tap an item in the scene. The item list at the bottom shows pictures (silhouettes at level 3); a hint button sits next to it.",
+      "progression": [
+        "The scene is built in code over 'bg': the 'bg' art content is unknown, so every findable item and every distractor is a sprite, an emoji text object or a shape placed by the game [H]",
+        "Goal: 15 items in total; the list shows 5 at a time and refills as they are found [S:junes][H]",
+        "Clutter: 25 distractors at level 1, 35 at level 2, 45 at level 3; random rotation +-30 degrees, scale 0.7-1.2, items may be up to 30% covered but never fully [H]",
+        "Make a target stand out by a unique colour or shape when it should be easy (feature search, 3 ms per item) and share colour or shape with the distractors when it should be hard (conjunction search, 29 ms per item) [S:treisman]",
+        "Target size matters more than clutter: a smaller target added 600-800 ms in real scenes vs 200-300 ms across all clutter sizes. Never make targets smaller than the audience tap target [S:wolfe2011]",
+        "Expect about 1-2 s of search per item in a real scene, so a clean run of 15 items takes about 40-60 s; timer = 1.3x the clean run, about 75 s [S:wolfe2011][H]",
+        "Level 2 at 5 found: list switches to silhouettes; level 3 at 10 found: one item per list is 'tricky' (small, rotated, half behind another object) [S:g5][S:gameboomers][H]"
+      ],
+      "objectKinds": [
+        "target item (from spec sprites or emoji), hit area at least the tap target",
+        "distractor (similar size, different identity)",
+        "decoy look-alike (same colour, different shape) from level 2",
+        "bonus item: +5 s, sparkles faintly"
+      ],
+      "powerUps": [
+        "Hint: a shrinking glowing ring closes in on one listed item; recharges in 20 s in a short round (Sphera Casual: 60 s) [S:sphera][H]",
+        "Bonus hint for finding 3 items in quick succession (Big Fish: 1 bonus hint per 3 rapid finds) [S:bigfish]",
+        "Magnifier: the area under the finger zooms x1.8 for 6 s [S:gameboomers][H]"
+      ],
+      "juice": [
+        "Found item: GG.fx.pop up to 1.3x, then it flies along an arc into its slot in the list, slot gets a check mark + GG.sfx('coin')",
+        "GG.fx.burst at the found spot in the item's colour + GG.fx.float('+1')",
+        "Quick-find combo (next find within 3 s): 'x2' float and rising pitch",
+        "Wrong tap: small grey ripple at the tap point + soft low click; 3 wrong taps within 1 s: screen-edge red pulse and GG.fx.shake('light')",
+        "Remaining items in the list bob gently; the last remaining item pulses",
+        "Hint ring: tweened circle shrinking over 1.2 s onto the item, then a wobble of the item",
+        "Level change: GG.fx.banner('Уровень 2!'), distractors scatter and re-settle with a 30 ms stagger"
+      ],
+      "failStates": ["Timer runs out with items left", "Random tapping: 3 wrong taps within 1 s cost 3 s (games use 5-30 s penalties or a cursor lock; locks longer than 1-2 s annoy players) [S:g5][S:bigfish][S:gameboomers]"],
+      "winCondition": "Find all 15 listed items before the timer ends.",
+      "audienceTweaks": {
+        "kids": "Picture list (never words), 10 items, 15-20 distractors, targets in unique bright colours, no wrong-tap penalty (Hidden Folks has none) [S:hiddenfolks], timer 2x clean run.",
+        "teens": "Silhouette list from the start, look-alike decoys, combo scoring, timer 1.2x.",
+        "adults": "Default.",
+        "seniors": "10 items, at most 20 distractors and no overlaps (older adults slow down most as items are added: 12 ms/item at 18-30 vs 25-27 ms/item after 66), large targets, hint recharge 10 s, no time penalty [S:hommel]."
+      },
+      "commonPitfalls": [
+        "Relying on the 'bg' illustration to contain the items: it is generated separately, so the code must place every item itself [H]",
+        "A target is completely covered by distractors or placed under the HUD or the mute corner, so it can never be found [H]",
+        "A distractor is the same emoji or sprite as a target, so the player taps the 'right' thing and it counts as wrong [H]",
+        "No cost for random tapping: tapping everywhere wins (hard rule) [S:bigfish]",
+        "List shows an item that was never spawned, so the game cannot be won [S:opengame]"
+      ],
+      "references": ["Mystery Case Files: Huntsville (Big Fish, 2005)", "June's Journey (Wooga, 2017)", "Hidden Folks (Adriaan de Jongh & Sylvain Tegroeg, 2017)"]
+    },
+    {
+      "id": "coloring",
+      "genre": "other",
+      "name_ru": "Раскраска по номерам",
+      "coreLoop": "A picture is split into numbered regions; pick a colour from the palette and tap the regions with its number until the picture is complete.",
+      "controls": "Tap a palette swatch at the bottom, then tap regions. Variant 'tracing': drag the finger along a dotted outline.",
+      "progression": [
+        "The picture is built from predefined shapes (Graphics polygons, circles, rounded rectangles) so every region is a known shape; hit-test with Phaser.Geom.Polygon.Contains / Circle.Contains. Never flood-fill pixels of an image [S:floodfill][H]",
+        "Palette of 4-6 colours (the older-adult coloring study used 6) [S:koo][H]",
+        "Goal: fill 24 regions over 3 pictures: 6, 8 and 10 regions [H]",
+        "Level 2 at 1/3: smaller regions and 5 colours; level 3 at 2/3: numbers show only for the selected colour, other regions are blank [H]",
+        "Regions of the selected colour are highlighted (Happy Color highlights active regions and shows per-colour progress on the swatch) [S:happycolor]",
+        "Timer = 1.3x a clean run, about 2.5 s per region [H]",
+        "Tracing variant: path of 20 checkpoints passed in order; the stroke counts while within 0.05 W of the path [S:patchan][H]"
+      ],
+      "objectKinds": [
+        "numbered region (empty, filled correctly, filled wrong)",
+        "palette swatch with progress ring",
+        "bonus sparkle region: fills its whole group at once",
+        "tracing path with checkpoints (variant)"
+      ],
+      "powerUps": [
+        "Bucket: the next tap fills every region of the selected colour, once per picture [H]",
+        "Hint: all remaining regions of the selected colour blink twice [S:happycolor][H]"
+      ],
+      "juice": [
+        "Fill: colour spreads from the tap point as a circle mask tween over 180 ms + GG.sfx('pop') with pitch rising per region",
+        "Correct region: small GG.fx.burst in that colour + region scales 1.08 and back",
+        "Wrong colour: region flashes the wrong colour 150 ms then clears, soft buzz, swatch of the right colour wiggles",
+        "Swatch progress ring fills; a finished colour's swatch gets a check mark and GG.fx.pop",
+        "Picture complete: outlines fade out, the picture bounces (GG.fx.squash), confetti GG.fx.burst x3, GG.fx.banner",
+        "Tracing: a brush trail drawn into a RenderTexture with stamps along pointer.getInterpolatedPosition() so fast strokes leave no gaps [S:phaser-rt]",
+        "Tracing checkpoint reached: star pops on the path + GG.sfx('coin')"
+      ],
+      "failStates": ["Timer runs out", "3 wrong fills in one picture (each wrong fill also costs 3 s)"],
+      "winCondition": "Colour all regions of all pictures correctly before the timer ends.",
+      "audienceTweaks": {
+        "kids": "4 colours, 6-region pictures with big shapes (regions at least 2 cm [S:nngkids]), no timer and no mistake limit, every fill plays a cheerful sound; tracing tolerance 0.08 W.",
+        "teens": "Timer 1.2x, combo for consecutive correct fills, stylised geometric (mandala-like) pictures.",
+        "adults": "Default; an optional free mode where any colour counts (choosing one's own colours reduced anxiety more than copying a coloured image) [S:eaton].",
+        "seniors": "Large regions, 4-5 high-contrast colours with the number also printed on the swatch, no timer; wrong fills just don't stick. Coloring sessions in studies with adults 55-75 lasted 20 min, so keep it calm and unhurried [S:koo]."
+      },
+      "commonPitfalls": [
+        "Pixel flood fill on an anti-aliased image leaks through edges or leaves halos; use predefined region shapes [S:floodfill]",
+        "Overlapping regions: one tap fills two, or the top shape steals taps from a small region beneath [H]",
+        "Regions smaller than the tap target, or numbers too small to read at the audience font size [H]",
+        "No stakes at all (no timer, no mistakes): the hard rules require a way to lose except for kids [H]",
+        "Brush stroke with gaps because only pointermove points are stamped [S:phaser-rt]"
+      ],
+      "references": ["Happy Color (X-FLOW)", "Color by Number apps", "Writing Wizard (L'Escapadou) for tracing"]
+    },
+    {
+      "id": "spot-difference",
+      "genre": "puzzle",
+      "name_ru": "Найди отличия",
+      "coreLoop": "Two nearly identical pictures are stacked; tap the spots where the bottom one differs from the top one.",
+      "controls": "Tap a difference on either picture; it is marked on both.",
+      "progression": [
+        "Portrait layout: two panels stacked under the HUD, each about 720x520, built from ONE seeded list of objects (sprites, emoji, shapes) over the same crop of 'bg'; differences are applied only to the bottom panel [H]",
+        "Goal: 12 differences over 3 picture pairs: 3, 4 and 5 (published games use 5, 7 or 10 per picture) [S:globeapps][S:japan10][H]",
+        "One difference among 30 objects per panel took about 11 s in the lab (colour differences 9.9 s, shape 12.0 s), so budget about 10 s per difference; timer = 1.3x, about 150 s for 12 [S:pomplun][H]",
+        "Level 1: colour changes on large, central objects; level 2 at 1/3: missing and added objects; level 3 at 2/3: small rotations, mirrored objects and changes in the margins. Changes to central objects were found 2.3x faster than marginal ones (4.7 s vs 10.9 s) [S:rensink][S:pomplun]",
+        "Objects per panel: 12 at level 1, 18 at level 2, 24 at level 3 [H]",
+        "Difference size: tint shift of at least 90 degrees of hue, scale change at least 1.4x, rotation at least 30 degrees; tap radius = max(tap target, 1.2x the object radius) [H]"
+      ],
+      "objectKinds": [
+        "shared object (identical in both panels)",
+        "colour difference (tinted)",
+        "missing / added object",
+        "transform difference (size, rotation, mirror)"
+      ],
+      "powerUps": [
+        "Hint: a soft pulse appears around one remaining difference after 15 s without a find, or on the hint button (recharge 20 s) [H]",
+        "Flicker peek: the bottom panel briefly swaps with the top for 0.3 s twice, which makes changes pop (flicker paradigm) [S:rensink][H]"
+      ],
+      "juice": [
+        "Found: a circle draws itself around the spot on both panels (stroke tween 250 ms) + GG.sfx('coin') + GG.fx.burst",
+        "Counter '3 / 5' pops on each find; the last find of a picture plays GG.fx.flash",
+        "Wrong tap: red cross appears and fades in 400 ms, GG.fx.shake('light'), the timer bar jumps down by the penalty",
+        "Two finds within 4 s: 'Быстро! +2' float",
+        "Picture solved: both panels slide out and the next pair slides in, GG.fx.banner",
+        "Timer bar turns red and ticks in the last 10 s"
+      ],
+      "failStates": ["Timer runs out", "Wrong taps cost 4 s each (published games use a time penalty) [S:globeapps]"],
+      "winCondition": "Find all 12 differences before the timer ends.",
+      "audienceTweaks": {
+        "kids": "3 big colour or missing-object differences per pair, 8-10 objects per panel, no penalty, hint pulses after 8 s.",
+        "teens": "4-6 subtle differences per pair, margin changes from level 1, speed bonus.",
+        "adults": "Default.",
+        "seniors": "Panels with at most 12 large objects, colour and missing-object differences only, no time penalty, hint after 10 s; spot-the-difference tasks are used in cognitive training programmes for adults 60+ [S:werise]."
+      },
+      "commonPitfalls": [
+        "Panels built with separate Math.random calls, so they differ everywhere; build both from one data list and apply only the planned differences [H]",
+        "A difference too subtle to see (tiny tint change, 1-2 px offset) or two differences overlapping [H]",
+        "Difference counted twice, or the tap marks only one panel [H]",
+        "Planned difference count and the goal disagree, so the game never ends [S:opengame]",
+        "Differences placed under the HUD, the mute corner or on the panel edge [H]"
+      ],
+      "references": ["Find the Difference Plus (GlobeApps)", "Japanese machigai sagashi puzzles (e.g. Saizeriya kids' menu)", "Photo Hunt (Merit Megatouch bar-top cabinets)"]
+    },
+    {
+      "id": "lane-racing",
+      "genre": "runner",
+      "name_ru": "Гонка с трафиком",
+      "coreLoop": "Drive a car up a busy road, weave between slower traffic and overtake enough cars before the time runs out.",
+      "controls": "Drag anywhere: the car follows the finger's x (position control), limited to 2.5 W/s sideways. Optional hold-to-brake button bottom left.",
+      "progression": [
+        "Goal: overtake a set number of cars (Enduro: 200 on day 1, 300 after); for a short round 30 cars [S:enduro][H]",
+        "Position control (car goes where the finger is) beat velocity control: 16.6% vs 23.5% misses [S:teather]",
+        "Road of 4 lanes scrolls via the 'bgLoop' tileSprite; player speed 1.0 H/s, traffic 0.35-0.6 H/s, so cars pass downward [H]",
+        "Time: start 40 s, +15 s at each level checkpoint (Out Run: 75 s start on Normal, +55-66 s per stage) [S:outrun][H]",
+        "Level 2 at 10 overtakes: oncoming traffic in the left 2 lanes (Traffic Racer two-way mode gives extra score) [S:trafficracer]",
+        "Level 3 at 20 overtakes: trucks that wreck you instantly (Road Fighter) or night with only taillights visible (Enduro) [S:roadfighter][S:enduro]",
+        "Traffic gets denser and spreads across the road as you go (Enduro); every spawn row leaves at least one free lane reachable at 2.5 W/s [S:enduro][S:spelunky]"
+      ],
+      "objectKinds": [
+        "slow car: overtake for +1",
+        "lane-changing car: blinks its indicator for 0.6 s before switching lanes",
+        "truck (level 3): instant crash",
+        "fuel/time can: +5 s, flashing colours like Road Fighter's fuel car"
+      ],
+      "powerUps": [
+        "Nitro: speed x1.5 and invulnerable for 4 s, flame trail [H]",
+        "Shield: survives one crash [H]",
+        "Time can: +5 s [S:roadfighter][H]"
+      ],
+      "juice": [
+        "Near miss (passing within 0.05 W): whoosh + 'Близко! +2' float (Traffic Racer gives bonus for close overtakes above 100 km/h) [S:trafficracer]",
+        "Overtake counter pops; every 5th overtake GG.sfx('coin') chord",
+        "Speed lines at the screen edges, more at higher speed; the car tilts 8 degrees toward its steering direction",
+        "Crash: car spins 360 degrees, GG.fx.shake('heavy'), 0.3 s slow-motion, skid marks stay on the road [S:nijman]",
+        "Checkpoint: GG.fx.banner('+15 с') and the timer digits flash green",
+        "Nitro: flame particles from the exhaust, camera zooms out 5%",
+        "Brake lights on traffic cars, indicator blink before a lane change"
+      ],
+      "failStates": ["Timer runs out before the overtake goal", "3 crashes (a normal crash costs 3 s and a recoverable slide; trucks end a life immediately) [S:roadfighter][H]"],
+      "winCondition": "Overtake 30 cars before the timer ends.",
+      "audienceTweaks": {
+        "kids": "Traffic only in the same direction, no trucks, crashes bounce the car aside without losing time, 20 overtakes.",
+        "teens": "Two-way traffic from level 1, near-miss combos, nitro more often.",
+        "adults": "Default.",
+        "seniors": "3 lanes, player speed 0.6 H/s, traffic spaced at least 1.5 s apart, generous time (+25 s per checkpoint), no night stage."
+      },
+      "commonPitfalls": [
+        "A row of traffic blocks every lane: impossible pattern [S:spelunky]",
+        "Car teleports to the finger with no speed limit, so dodging needs no skill [H]",
+        "Overtakes counted every frame while a car is below the player instead of once per car [S:factorsim]",
+        "Full-sprite hitboxes for top-down cars make side passes feel unfair; use a body about 60% of the car's width [S:canabalt]",
+        "Scrolling the 'bg' image itself instead of the 'bgLoop' tileSprite [H]"
+      ],
+      "references": ["Enduro (Activision, 1983)", "Road Fighter (Konami, 1984)", "Traffic Racer (Soner Kara, 2012)"]
+    }
+  ]
+}

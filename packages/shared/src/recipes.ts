@@ -1,9 +1,10 @@
 import recipesJson from "./genre-recipes.json";
+import extraJson from "./genre-recipes-extra.json";
 import type { Audience } from "./spec";
 
 /**
- * Рецепты жанров эпохи Flash и мобильных казуалок (research/genre-recipes.json, источники —
- * research/genre-recipes-sources.md): прогрессия с числами, типы объектов, бонусы, эффекты, типичные
+ * Рецепты жанров эпохи Flash и мобильных казуалок (research/genre-recipes.json и genre-recipes-extra.json, источники —
+ * research/genre-recipes*-sources.md): прогрессия с числами, типы объектов, бонусы, эффекты, типичные
  * ошибки генерации. Спека выбирает рецепт, код получает общие правила и один рецепт.
  */
 interface Recipe {
@@ -14,7 +15,10 @@ interface Recipe {
   audienceTweaks: Record<Audience, unknown>;
   [k: string]: unknown;
 }
-const data = recipesJson as unknown as { conventions: Record<string, unknown>; genres: Recipe[] };
+const base = recipesJson as unknown as { conventions: Record<string, unknown>; genres: Recipe[] };
+/** Дополнительные жанры (поиск предметов, раскраска, отличия, гонка) — conventions общие. */
+const extra = extraJson as unknown as { genres: Recipe[] };
+const data = { conventions: base.conventions, genres: [...base.genres, ...extra.genres] };
 
 export const RECIPE_IDS = data.genres.map((g) => g.id);
 
