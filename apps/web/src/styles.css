@@ -269,7 +269,8 @@ p { margin: 0; text-wrap: pretty; }
 .code { height: 100%; overflow: auto; background: var(--bg); font: 13px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 .code-head { position: sticky; top: 0; display: flex; justify-content: space-between; gap: 12px; padding: 10px 18px; background: var(--bg-subtle); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); font-family: "Golos Text Variable", system-ui, sans-serif; }
 .code pre { margin: 0; padding: 14px 0; counter-reset: line; tab-size: 2; }
-.code .sh__line { display: block; padding: 0 18px 0 0; }
+/* sugar-high разделяет строки переводом строки, поэтому строка остаётся inline: иначе в <pre> перенос двойной. */
+.code .sh__line { display: inline; }
 .code .sh__line::before { counter-increment: line; content: counter(line); display: inline-block; width: 4.5ch; margin-right: 16px; text-align: right; color: var(--faint); user-select: none; }
 :root { --sh-class: #0b6e99; --sh-identifier: var(--ink); --sh-sign: #8a8f98; --sh-property: #2448f5; --sh-entity: #7a3fc4; --sh-jsxliterals: #0f766e; --sh-string: #157a3b; --sh-keyword: #c0271f; --sh-comment: #9a9ea6; }
 @media (prefers-color-scheme: dark) { :root { --sh-class: #5cc6f2; --sh-property: #8ea2ff; --sh-entity: #c49bff; --sh-string: #6fd49a; --sh-keyword: #ff8b84; --sh-comment: #6a6e76; } }
