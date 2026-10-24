@@ -227,7 +227,11 @@
     } else {
       card.appendChild(el("h1", "gg-title", kind === "won" ? "Победа!" : "Игра окончена"));
       if (message) card.appendChild(el("p", "gg-text", message));
-      if (goal) card.appendChild(el("p", "gg-score", (goal.label || "Цель") + ": " + goal.done + " / " + goal.total));
+      if (goal) {
+        var gl = el("p", "gg-score", (goal.label || "Цель") + ": " + goal.done + " / " + goal.total);
+        if (contrast(cfg.palette.primary, cfg.palette.background) < 3) gl.style.color = cfg.palette.text;
+        card.appendChild(gl);
+      }
       card.appendChild(el("p", goal ? "gg-sub" : "gg-score", "Счёт: " + score));
       card.appendChild(el("p", "gg-sub", newRecord ? "Новый рекорд!" : "Рекорд: " + best));
     }
@@ -245,6 +249,16 @@
     card.appendChild(btn);
     overlay.appendChild(card);
     overlay.style.display = "flex";
+  }
+  function lum(hex) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex || "");
+    if (!m) return 0;
+    var lin = function (v) { v = parseInt(v, 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(m[1]) + 0.7152 * lin(m[2]) + 0.0722 * lin(m[3]);
+  }
+  function contrast(a, b) {
+    var x = lum(a), y = lum(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   }
   /** Цвет текста кнопки по яркости её фона: палитра модели бывает «белое на белом». */
   function readableOn(hex) {
@@ -269,6 +283,7 @@
   /** Жизни, прощение первой ошибки и цель раунда ведёт рантайм: модель путала их порядок с разминкой. */
   var lives = 3;
   var forgiven = false;
+  var softMistakes = 0;
   var invulnerableUntil = 0;
   var goal = null;
   function roundMs() {
@@ -290,6 +305,7 @@
     activeMs = 0;
     lives = (cfg.balance && cfg.balance.lives) || 3;
     forgiven = false;
+    softMistakes = 0;
     invulnerableUntil = 0;
     goal = null;
     recentHits = [];
@@ -311,7 +327,7 @@
     vibrate(won ? [30, 40, 30] : 120);
     var sc = gameScene();
     // Победу часто даёт то же попадание, что включило замирание кадра: финал должен двигаться.
-    if (hitstopActive && sc && sc.sys.isPaused()) sc.scene.resume();
+    if (hitstopActive && sc) sc.sys.resume();
     hitstopActive = false;
     if (won) fx.burst(W / 2, H * 0.45, null, 40, true);
     // Финальные частицы и вспышка видны: сцена живёт ещё 800 мс, потом замирает под карточкой.
@@ -401,6 +417,21 @@
     loop.refresh();
     for (var k in sprites) {
       if (tx.exists(k)) continue;
+      // Снаряд без картинки: светящаяся капсула цвета primary, а не emoji (☄️ путался с врагами).
+      if (/bullet|laser|bolt|shot|projectile|missile|beam|dart/i.test(k)) {
+        var cap = tx.createCanvas(k, 256, 256);
+        var c2 = cap.getContext();
+        var g2 = c2.createRadialGradient(128, 128, 10, 128, 128, 120);
+        g2.addColorStop(0, "#ffffff");
+        g2.addColorStop(0.35, cfg.palette.primary);
+        g2.addColorStop(1, "rgba(0,0,0,0)");
+        c2.fillStyle = g2;
+        c2.beginPath();
+        c2.ellipse(128, 128, 46, 118, 0, 0, Math.PI * 2);
+        c2.fill();
+        cap.refresh();
+        continue;
+      }
       var c = tx.createCanvas(k, 256, 256);
       var cx = c.getContext();
       cx.font = "200px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
@@ -468,7 +499,12 @@
   var recentHits = [];
   /** Граница HUD: эффекты не рисуются выше неё, объекты появляются ниже. */
   var TOP = 200;
-  var fxY = function (y) { return Math.max(y, TOP + 30); };
+  /** Эффекты в мировых координатах не выше HUD в видимой области (с учётом прокрутки камеры). */
+  var fxY = function (y) {
+    var sc = gameScene();
+    var top = sc ? sc.cameras.main.worldView.y : 0;
+    return Math.max(y, top + TOP + 30);
+  };
   /** На светлом фоне аддитивные искры сливаются в белые пятна: там обычное смешивание и насыщенный цвет. */
   function darkBg() {
     var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(cfg.palette.background || "");
@@ -489,14 +525,15 @@
       em.explode(n);
     },
     /** Всплывающий текст «+10» над местом события. */
-    float: function (x, y, text, color) {
+    float: function (x, y, text, color, screen) {
       var sc = sceneNow();
       if (!sc) return;
-      y = fxY(y);
+      if (!screen) y = fxY(y);
       var t = sc.add
         .text(x, y, String(text), { fontFamily: GG.font, fontSize: Math.round(46 * Math.min(cfg.uiScale, 1.4)) + "px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 8 })
         .setOrigin(0.5)
         .setDepth(45);
+      if (screen) t.setScrollFactor(0);
       sc.tweens.add({ targets: t, y: y - 120, alpha: 0, scale: 1.25, duration: 750, ease: "Cubic.Out", onComplete: function () { t.destroy(); } });
     },
     /**
@@ -519,12 +556,14 @@
       if (now > hitstopUntil + 150 && state === "playing") {
         hitstopUntil = now + 60;
         hitstopActive = true;
-        sc.scene.pause();
+        // sys.pause/resume применяются сразу; scene.pause встаёт в очередь до следующего такта,
+        // и тогда финал, начатый тем же тапом, замерзал.
+        sc.sys.pause();
         setTimeout(function () {
           if (!hitstopActive) return;
           hitstopActive = false;
           // Пользовательская пауза (свернули вкладку) не снимается; победа и поражение — снимаются.
-          if (state !== "paused" && sc.sys.isPaused()) sc.scene.resume();
+          if (state !== "paused") sc.sys.resume();
         }, 60);
       }
     },
@@ -556,16 +595,16 @@
       var pulse = sc.add.rectangle(W / 2, H / 2, W, H, tintOf(color || "#ffffff"), 0.22).setDepth(47).setScrollFactor(0);
       sc.tweens.add({ targets: pulse, alpha: 0, duration: 380, ease: "Quad.Out", onComplete: function () { pulse.destroy(); } });
     },
-    /** Баннер «Уровень 2!»: в экранных координатах под HUD (y≈300), текст ужимается до ширины экрана, около секунды. */
+    /** Баннер «Уровень 2!»: в экранных координатах поверх полосы HUD (игровое поле не закрывает), около секунды. */
     banner: function (text, color) {
       var sc = sceneNow();
       if (!sc) return;
-      var y = 300;
-      var bg = sc.add.rectangle(W / 2, y, W, 120, 0x000000, 0.45).setDepth(48).setScrollFactor(0);
+      var y = TOP / 2;
+      var bg = sc.add.rectangle(W / 2, y, W, TOP, 0x000000, 0.72).setDepth(150).setScrollFactor(0);
       var t = sc.add
         .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "60px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 10 })
         .setOrigin(0.5)
-        .setDepth(49)
+        .setDepth(151)
         .setScrollFactor(0);
       var fit = Math.min(1, 660 / Math.max(1, t.width));
       bg.scaleY = 0;
@@ -593,12 +632,14 @@
     },
   };
 
-  /** Честный хитбокс: круг по центру текстуры, k — доля меньшей стороны кадра (0.7 по умолчанию). */
+  /**
+   * Честный хитбокс: прямоугольник по центру, k — доля размера кадра (0.7 по умолчанию).
+   * setSize масштабируется вместе с объектом; радиус setCircle Phaser не масштабирует (ловля «магнитом»).
+   */
   function hitbox(obj, k) {
     if (!obj || !obj.body) return obj;
-    var w = obj.width, h = obj.height;
-    var r = (Math.min(w, h) * (k || 0.7)) / 2;
-    obj.body.setCircle(r, w / 2 - r, h / 2 - r);
+    k = k || 0.7;
+    obj.body.setSize(obj.width * k, obj.height * k, true);
     if (obj.body.isStatic && obj.refreshBody) obj.refreshBody();
     return obj;
   }
@@ -639,17 +680,22 @@
      * Ошибка игрока (удар, пропуск, падение). Рантайм сам применяет порядок: разминка → прощение первой
      * ошибки → неуязвимость → минус жизнь → поражение. Возвращает "warmup" | "forgiven" | "invulnerable" | "hit" | "dead".
      */
-    damage: function (reason) {
+    damage: function (reason, opts) {
       if (state !== "playing") return "invulnerable";
       var now = Date.now();
-      var warm = ((cfg.balance && cfg.balance.warmupSec) || 10) * 1000;
-      if (roundMs() < warm) return "warmup";
+      if (GG.inWarmup()) return "warmup";
+      // Мягкая ошибка (тап мимо, неточность): три мягких = одна настоящая.
+      if (opts && opts.soft) {
+        softMistakes++;
+        if (softMistakes < 3) return "soft";
+        softMistakes = 0;
+      }
       if (now < invulnerableUntil) return "invulnerable";
       invulnerableUntil = now + 900;
       if (!forgiven) {
         forgiven = true;
         fx.shake("light");
-        fx.float(W / 2, TOP + 120, "Осторожно!", "#ffd166");
+        fx.float(W / 2, TOP + 120, "Осторожно!", "#ffd166", true);
         return "forgiven";
       }
       lives = Math.max(0, lives - 1);
@@ -657,17 +703,19 @@
       SFX.hit();
       vibrate(80);
       if (lives === 0) {
-        finish(false, reason || "Жизни закончились");
+        finish(false, "Жизни закончились");
         return "dead";
       }
       return "hit";
     },
+    /** Идёт разминка: ошибки не считаются, опасности не появляются. */
+    inWarmup: function () { return state === "playing" && roundMs() < ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000; },
     /** Прогресс цели для HUD и финальной карточки: GG.setGoal(12, 24, 'Фрукты'). */
     setGoal: function (done, total, label) { goal = { done: Math.max(0, done | 0), total: Math.max(1, total | 0), label: label ? String(label).slice(0, 24) : "" }; },
     /** Был ли рядом недавний GG.fx.hit: тап по только что сбитому объекту не считается промахом. */
     recentlyHit: function (x, y, r, ms) {
       var now = Date.now();
-      r = r || 90;
+      r = r || 120;
       ms = ms || 400;
       for (var i = recentHits.length - 1; i >= 0; i--) {
         var h = recentHits[i];

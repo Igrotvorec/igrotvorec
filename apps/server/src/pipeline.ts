@@ -21,8 +21,11 @@ import { addVersion, createGame, getGame, getVersion } from "./db";
 import { observationsFor } from "./stats";
 import { generateSprites, settleSprites, type SpriteMap } from "./assets";
 
-/** Сколько ждать картинки после готовности кода. */
-const SPRITE_GRACE_MS = 20_000;
+/**
+ * Сколько ждать картинки после готовности кода. Фон и спрайты дают половину впечатления от игры, а
+ * модель картинок под нагрузкой отвечает до ~1,5 мин; лимит генерации у организаторов — 15 мин.
+ */
+const SPRITE_GRACE_MS = Number(process.env.SPRITE_GRACE_MS ?? 120_000);
 
 /** Движок новых игр. Старые версии правятся и чинятся своим движком (spec.engine, по умолчанию kit). */
 const NEW_GAME_ENGINE: GameEngine = process.env.GAME_ENGINE === "kit" ? "kit" : "phaser";

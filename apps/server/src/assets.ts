@@ -4,6 +4,24 @@ import { config } from "./config";
 import { llm } from "./llm";
 import { STYLE as PHASER_STYLE } from "./prompts-phaser";
 
+/**
+ * Общий лимит одновременных запросов к модели картинок: при параллельных генерациях (бенчмарк, жюри
+ * с нескольких телефонов) прокси не успевал, и картинки падали по таймауту.
+ */
+const IMAGE_CONCURRENCY = Number(process.env.IMAGE_CONCURRENCY ?? 8);
+let imagesRunning = 0;
+const imageQueue: (() => void)[] = [];
+async function withImageSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (imagesRunning >= IMAGE_CONCURRENCY) await new Promise<void>((ok) => imageQueue.push(ok));
+  imagesRunning++;
+  try {
+    return await fn();
+  } finally {
+    imagesRunning--;
+    imageQueue.shift()?.();
+  }
+}
+
 /** Готовые картинки: ключ спрайта → data:URI (WebP с прозрачностью, до 256px); "bg" — фон сцены Phaser 720×1280. */
 export type SpriteMap = Record<string, string>;
 
@@ -22,7 +40,7 @@ function spritePrompt(spec: GameSpec, description: string) {
 }
 
 async function generateSprite(spec: GameSpec, description: string, signal: AbortSignal): Promise<string> {
-  const res = await llm.images.generate(
+  const res = await withImageSlot(() => llm.images.generate(
     {
       model: config.imageModel,
       prompt: spritePrompt(spec, description),
@@ -33,7 +51,7 @@ async function generateSprite(spec: GameSpec, description: string, signal: Abort
       n: 1,
     },
     { signal },
-  );
+  ));
   const b64 = res.data?.[0]?.b64_json;
   if (!b64) throw new Error("image model returned no data");
   // trim убирает пустые поля вокруг объекта, чтобы спрайт занимал весь прямоугольник отрисовки.
@@ -48,7 +66,7 @@ async function generateSprite(spec: GameSpec, description: string, signal: Abort
 /** Фон сцены для Phaser: портретная картинка без персонажей и текста, WebP 720×1280. */
 async function generateBackground(spec: GameSpec, signal: AbortSignal): Promise<string> {
   const p = AUDIENCE_PROFILES[spec.audience];
-  const res = await llm.images.generate(
+  const res = await withImageSlot(() => llm.images.generate(
     {
       model: config.imageModel,
       prompt: `Mobile game background, portrait full-screen scene: ${spec.background}. Style: ${PHASER_STYLE}; ${p.paletteHint}; colors around ${spec.palette.background} and ${spec.palette.primary}. No characters, no text, no UI, no logos; calm, uncluttered middle area for gameplay.`,
@@ -58,7 +76,7 @@ async function generateBackground(spec: GameSpec, signal: AbortSignal): Promise<
       n: 1,
     },
     { signal },
-  );
+  ));
   const b64 = res.data?.[0]?.b64_json;
   if (!b64) throw new Error("image model returned no data");
   const webp = await sharp(Buffer.from(b64, "base64")).resize(720, 1280, { fit: "cover" }).webp({ quality: 74 }).toBuffer();

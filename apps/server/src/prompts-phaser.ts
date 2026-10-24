@@ -37,7 +37,7 @@ Fields:
   - warmupSec: 6-12 s at the start when mistakes do not count (longer for kids and seniors);
   - lives: 3-5 (more for kids and seniors); one mistake costs one life, so it is at most ~1/3 of the reserve;
   - cleanRunSec: how long a good player needs to reach the goal (20-90 s);
-  - timeLimitSec: 1.3-1.5 × cleanRunSec when time pressure is part of the game, otherwise 0 (no timer);
+  - timeLimitSec: 0 (no timer) by default — difficulty comes from lives. Use 1.3-1.5 × cleanRunSec only when time pressure IS the game: quiz, hidden objects, racing, or the user asked "на время";
   - spawnPerSec: how many objects or threats appear per second at level 1 (a careless player can keep up at level 1).
   Levels and new threats begin only after the warm-up.
 - recipe: the proven genre recipe closest to the request; its progression, object kinds and power-ups guide the design (keep the user's theme and ideas). "custom" only if none fits at all.
@@ -89,7 +89,7 @@ GG.fx — ready-made juice with tuned sizes and timings. Use these instead of ha
 - GG.fx.hit(obj, color?) — hit a target: 60 ms hitstop, sparks, the object flies off spinning and is destroyed (do not destroy it yourself). It becomes inactive immediately: skip it everywhere with GG.alive(obj) (taps, overlaps, counting, "missed" checks) so a tap on a dying object is never a miss;
 - GG.fx.shake('light' | 'medium' | 'heavy') — light on hit, medium on damage, heavy on explosion or boss;
 - GG.fx.flash(color?) — only for big moments (power-up, boss down); the runtime limits it;
-- GG.fx.banner('Уровень 2!') — level/wave banner just below the HUD (screen space, works with a moving camera), plays its own sound; keep the text short;
+- GG.fx.banner('Уровень 2!') — level/wave banner over the HUD band for about a second (screen space, works with a moving camera, never covers the playfield), plays its own sound; keep the text short;
 - GG.fx.pop(obj) — spawn animation (grows from 0 to its current scale; call after setDisplaySize); returns obj;
 - GG.fx.squash(obj) — squash & stretch on landing or catching; safe to call often.
 - GG.hitbox(obj, k) and GG.alive(obj) — see above.
@@ -98,7 +98,8 @@ GG.fx — ready-made juice with tuned sizes and timings. Use these instead of ha
 Balance API (the runtime owns these rules; do not reimplement them):
 - GG.balance = { warmupSec, lives, cleanRunSec, timeLimitSec, spawnPerSec } from the spec. Use these numbers for the timer, lives and level-1 spawn rate; do not invent your own.
 - GG.lives — current lives (read it for the hearts in the HUD); the runtime sets it from GG.balance.lives each round.
-- GG.damage(reason) — call on EVERY player mistake (hit, missed object, fall, wrong tap). The runtime applies warm-up, forgives the first mistake after it, gives 0.9 s invulnerability, takes a life, and calls GG.lose itself when lives run out. It returns 'warmup' | 'forgiven' | 'invulnerable' | 'hit' | 'dead'; react visually only to 'hit' (blink the player) and stop the scene logic on 'dead'. Never count lives, warm-up or forgiveness yourself.
+- GG.damage(reason) — a real mistake: a missed or dropped object, a hit by danger, a fall. GG.damage(reason, { soft: true }) — a small mistake: a tap that hits nothing, an inaccurate shot, a wrong card (three soft mistakes cost one life). The runtime applies warm-up, forgives the first mistake after it, gives 0.9 s invulnerability, takes a life, and ends the round itself when lives run out. It returns 'warmup' | 'soft' | 'forgiven' | 'invulnerable' | 'hit' | 'dead'; react visually only to 'hit' (blink the player), show GG.fx.miss for 'soft', and stop the scene logic on 'dead'. Never count lives, warm-up or forgiveness yourself.
+- GG.inWarmup() — true during the warm-up: spawn no hazards and do not start level 2 while it is true; objects created during the warm-up must stay harmless.
 - GG.setGoal(done, total, label) — call whenever goal progress changes; the result card shows it.
 - GG.recentlyHit(x, y) — true if GG.fx.hit happened there in the last 0.4 s: return early from a tap handler instead of counting a miss.
 - GG.top (200) — the bottom of the HUD band.
@@ -117,7 +118,7 @@ Phaser 3.90 API that works (prefer these exact forms):
 - depth: setDepth; random: Phaser.Math.Between(a, b), Phaser.Math.FloatBetween, Phaser.Utils.Array.GetRandom(arr); clamp: Phaser.Math.Clamp.
 
 Balance and stakes (most important; a game nobody can lose is a failure):
-- Track the goal in countable objects or events from the spec (caught, hit, reached), show it as "12 / 25" with a progress bar, call GG.setGoal on every change and GG.win(...) the moment it is reached. GG.score is for the record and can include bonuses, but never decides the win.
+- Track the goal in countable objects or events from the spec (caught, hit, reached), show it as "12 / 25" with a progress bar, call GG.setGoal and update the HUD on every change, and call GG.win(...) right after the HUD shows the final count. GG.score is for the record and can include bonuses, but never decides the win.
 - Mistakes go through GG.damage(reason) (it shakes, plays the sound and handles lives). Danger must be able to reach the player.
 - No random-spam strategy: if tapping everywhere would work, add a cost for misses.
 - Levels switch on goal progress (1/3 and 2/3 of the goal), not on a clock; each level adds a NEW object or rule (new enemy type, moving obstacle, faster pattern) and shows GG.fx.banner. The last third is a final wave or a boss.
@@ -126,7 +127,7 @@ Balance and stakes (most important; a game nobody can lose is a failure):
 - Difficulty curve: level 1 runs at GG.balance.spawnPerSec, pressure grows toward level 2 after the warm-up. Target: a careless player loses in about half of the attempts, and not before the middle of the round; an attentive player wins.
 - Always passable: never permanently remove something the player needs to progress (a vanishing platform respawns, the next platform is always within jump height, there is always a way out). No soft locks where the player can only wait for the timer.
 - Threat before the finale: from level 2 (and never during the warm-up) enemies enter from beyond the screen edge, move and attack; danger is not saved for the boss only.
-- Playfield: objects appear and can be hit, caught or tapped only below GG.top + 20; player projectiles are destroyed when they reach GG.top; keep 40 px neutral margins at the left and right edges (nothing unreachable there).
+- Playfield: objects appear and can be hit, caught or tapped only below GG.top + 20; an object is targetable over its whole visible part, including the edge it enters from (a tap on a visible object is never a miss); player projectiles are destroyed when they reach GG.top; keep 40 px neutral margins at the left and right edges (nothing unreachable there).
 - Catching objects (basket, paddle, player that collects) get a generous hitbox: GG.hitbox(obj, 0.85), 0.9 for kids and seniors. Dangerous things use 0.6-0.7.
 
 Make it feel like a hit Flash game (all required):
