@@ -58,6 +58,7 @@ export const GameSpecSchema = z.object({
       factor: z.number(),
       failed: z.boolean().optional(),
       warmupLeak: z.boolean().optional(),
+      stall: z.boolean().optional(),
       lives: z.number().optional(),
       timeLimitSec: z.number().optional(),
       goodMs: z.number().optional(),

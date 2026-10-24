@@ -28,6 +28,8 @@ export interface TuneReport {
   /** Подбор не попал в цель (край лестницы, наугад выигрывает, цель набирается в разминке). */
   failed: boolean;
   warmupLeak: boolean;
+  /** Небрежный проигрывает по правилу 30 с при живых жизнях: зацикливание в игре. */
+  stall: boolean;
   /** Бот игры не годится для оценки (хороший не выигрывает): параметры не меняются. */
   skipped?: boolean;
   /** Множитель GG.speed, при котором баланс попал в цель. */
@@ -90,11 +92,13 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
       if (!r || typeof r !== "object" || Array.isArray(r)) return null;
       const n = (v: unknown, max: number) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= max ? v : null);
       const factor = n(r.factor, 2);
-      if (factor === null || !TUNE_FACTORS.includes(factor)) return null;
+      // Множитель из лестницы рантайма или промежуточный между её ступенями (шаг 0,01).
+      if (factor === null || factor < TUNE_FACTORS[0]! || factor > TUNE_FACTORS.at(-1)! || Math.abs(factor * 100 - Math.round(factor * 100)) > 1e-6) return null;
       const report: TuneReport = {
         failed: r.failed === true,
         ...(r.skipped === true ? { skipped: true } : {}),
         warmupLeak: r.warmupLeak === true,
+        stall: r.stall === true,
         factor,
         lives: Math.round(n(r.lives, 9) ?? 3) || 3,
         timeLimitSec: Math.round(n(r.timeLimitSec, 600) ?? 0),

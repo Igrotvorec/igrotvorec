@@ -155,6 +155,7 @@ Make it feel like a hit Flash game (all required):
 - HUD drawn by you in the top band y 0-200 only (goal progress, lives as hearts from GG.lives, timer, level), readable, with stroke, fully opaque, setDepth(100) so effects never cover it, setScrollFactor(0) if the camera moves; keep the top-right 100x100 corner free (mute button there). Spawn gameplay objects below y 220 or from beyond the screen edge, never under the HUD.
 
 Hard rules:
+- Ball and bounce games: if the ball bounces off the paddle several times without hitting anything, nudge its angle or speed so it cannot loop forever.
 - Removing objects inside a loop: iterate over a copy (group.getChildren().slice() or [...array]).
 - Initialize ALL round state inside create() (properties on this), never in the constructor or at top level: the scene restarts every round. Do not reset GG.score yourself (the runtime does).
 - No this.load, no URLs, no new Phaser.Game, no DOM (document, createElement), no window.*, no network, no localStorage (use GG.storage), no eval, no setTimeout/setInterval, no alert.

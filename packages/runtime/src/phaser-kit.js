@@ -303,10 +303,11 @@
   var softAt = 0;
   var goalMovedAt = 0;
   /** Раунд без таймера не должен длиться вечно: если цель не двигается 30 с после разминки — поражение. */
+  var STALL_MSG = "Цель не сдвинулась 30 секунд";
   function stallCheck() {
     if (state !== "playing" || !goal || GG.inWarmup()) return;
     var warm = ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000 / speedFactor;
-    if (roundMs() - Math.max(goalMovedAt, warm) > 30000) finish(false, "Цель не сдвинулась 30 секунд");
+    if (roundMs() - Math.max(goalMovedAt, warm) > 30000) finish(false, STALL_MSG);
   }
   setInterval(function () { if (!sim) stallCheck(); }, 1000);
   var invulnerableUntil = 0;
@@ -347,7 +348,7 @@
   function finish(won, message) {
     if (state !== "playing") return;
     if (sim) {
-      simResult = { won: won, ms: roundMs() };
+      simResult = { won: won, ms: roundMs(), stall: !won && message === STALL_MSG };
       state = won ? "won" : "lost";
       return;
     }
@@ -757,27 +758,41 @@
   var botSkill = 1;
   var botQueue = [];
   var botNoise = { x: 0, y: 0 };
+  var noiseTarget = { x: 0, y: 0 }, noiseRetarget = 0;
   var distractedUntil = 0, nextDistraction = 0;
   function botReaction() { return 120 + 300 * (1 - botSkill); }
+  function newNoise() {
+    var spread = 130 * (1 - botSkill);
+    return { x: (Math.random() * 2 - 1) * spread, y: (Math.random() * 2 - 1) * spread * 0.5 };
+  }
   function botCommand(type, x, y) {
     if (!sim) return bot[type](x, y);
-    if (simNow < distractedUntil) return;
-    // Новый жест (нажатие или касание) — новый промах; перемещения жеста сдвинуты на тот же промах.
-    if (type === "tap" || type === "down") {
-      var spread = 130 * (1 - botSkill);
-      botNoise = { x: (Math.random() * 2 - 1) * spread, y: (Math.random() * 2 - 1) * spread * 0.5 };
-    }
-    botQueue.push({ t: simNow + botReaction(), type: type, x: x == null ? null : x + botNoise.x, y: y == null ? null : y + botNoise.y });
+    var gesture = type === "tap" || type === "down";
+    // Человек ждёт результата касания: пока своё касание ещё «в пути», новое не делает (иначе веер выстрелов).
+    if (gesture && botQueue.some(function (c) { return c.type === "tap" || c.type === "down"; })) return;
+    // Во время отвлечения теряются только движения; нажатия и отпускания доходят после него.
+    if (simNow < distractedUntil && type === "move") return;
+    if (gesture) noiseTarget = botNoise = newNoise();
+    var at = Math.max(simNow + botReaction(), type === "move" ? 0 : distractedUntil);
+    botQueue.push({ t: at, type: type, rx: x, ry: y });
   }
   function botFlush() {
+    // Промах дрейфует и во время долгого удержания: новая цель раз в 0,5-1 с, плавный переход.
+    if (simNow >= noiseRetarget) {
+      noiseTarget = newNoise();
+      noiseRetarget = simNow + 500 + Math.random() * 500;
+    }
+    botNoise.x += (noiseTarget.x - botNoise.x) * 0.06;
+    botNoise.y += (noiseTarget.y - botNoise.y) * 0.06;
     if (botSkill < 1 && simNow >= nextDistraction) {
       distractedUntil = simNow + 700 + Math.random() * 600;
       nextDistraction = distractedUntil + 4000 + Math.random() * 5000;
     }
+    botQueue.sort(function (a, b) { return a.t - b.t; });
     while (botQueue.length && botQueue[0].t <= simNow) {
       var c = botQueue.shift();
-      var cx = c.x == null ? null : Math.max(4, Math.min(W - 4, c.x));
-      var cy = c.y == null ? null : Math.max(4, Math.min(H - 4, c.y));
+      var cx = c.rx == null ? null : Math.max(4, Math.min(W - 4, c.rx + botNoise.x));
+      var cy = c.ry == null ? null : Math.max(4, Math.min(H - 4, c.ry + botNoise.y));
       bot[c.type](cx, cy);
     }
   }
@@ -828,6 +843,9 @@
     var act = kind === "random" ? randomBot() : null;
     botSkill = typeof kind === "number" ? kind : 1;
     botQueue = [];
+    botNoise = { x: 0, y: 0 };
+    noiseTarget = { x: 0, y: 0 };
+    noiseRetarget = 0;
     distractedUntil = 0;
     nextDistraction = 3000 + Math.random() * 4000;
     var steps = 0;
@@ -880,6 +898,18 @@
     var idx = ladder.indexOf(1);
     var tried = {};
     var chosen = null;
+    var midTried = false;
+    /** После вставки промежуточной ступени индексы выше неё сдвигаются на один. */
+    function remapTried(t, at) {
+      var out = {};
+      for (var k in t) {
+        var parts = k.split(":");
+        var i = +parts[0];
+        if (i >= at) t[k].idx = i + 1;
+        out[(i >= at ? i + 1 : i) + ":" + parts[1] + ":" + parts[2]] = t[k];
+      }
+      return out;
+    }
     game.loop.sleep();
     sim = true;
     try {
@@ -902,6 +932,7 @@
         var cWins = careless.filter(function (g) { return g.won; }).length;
         var cTimeouts = careless.filter(function (g) { return !g.won && timeLimit0 && g.ms >= timeLimit0 * 1000 - 500; }).length;
         var rWins = randoms.filter(function (g) { return g.won; }).length;
+        var cStalls = careless.filter(function (g) { return g.stall; }).length;
         var r = { idx: idx, factor: f, lives: lives0, timeLimitSec: timeLimit0, goodWon: gWins > 0, goodMs: Math.round(goods[0].ms), carelessWins: cWins, carelessMs: Math.round(careless.reduce(function (s, g) { return s + g.ms; }, 0) / careless.length), randomWon: rWins > 0 };
         // Цель: хороший выигрывает, наугад нет; небрежный выигрывает 3-5 из 8 (дети и пожилые 5-8 из 8).
         r.tooHard = gWins === 0 || cWins < (calm ? 10 : 6);
@@ -911,8 +942,14 @@
         r.warmupLeak = goods.some(function (g) { return g.warmFrac > 0.3; });
         // Небрежный проигрывает по таймеру, а не по ошибкам — помогает только больше времени.
         r.timerBound = r.tooHard && timeLimit0 && cTimeouts >= (16 - cWins) / 2;
+        // Небрежный «проигрывает» по правилу 30 с при живых жизнях: в игре зацикливание, а не сложность.
+        r.stallBound = cStalls * 3 > 16 - cWins && 16 - cWins > 0;
         tried[idx + ":" + lives0 + ":" + timeLimit0] = r;
         if (/[#&]tunedebug=1/.test(location.hash)) console.log("TUNEDBG " + JSON.stringify(r));
+        if (r.stallBound) {
+          chosen = r;
+          break;
+        }
         if (!r.tooHard && !r.tooEasy) {
           chosen = r;
           break;
@@ -933,7 +970,21 @@
           lives0 = Math.max(2, lives0 - 1);
           continue;
         }
-        if (next < 0 || next >= ladder.length || tried[next + ":" + lives0 + ":" + timeLimit0]) break;
+        if (next >= 0 && next < ladder.length && tried[next + ":" + lives0 + ":" + timeLimit0]) {
+          // Соседняя ступень по другую сторону окна: переход резкий, пробуем середину между ними.
+          var other = tried[next + ":" + lives0 + ":" + timeLimit0];
+          if (other.tooHard !== r.tooHard && !midTried) {
+            midTried = true;
+            ladder = ladder.slice();
+            var mid = Math.round(((ladder[idx] + ladder[next]) / 2) * 100) / 100;
+            ladder.splice(Math.max(idx, next), 0, mid);
+            idx = Math.max(idx, next);
+            tried = remapTried(tried, idx);
+            continue;
+          }
+          break;
+        }
+        if (next < 0 || next >= ladder.length) break;
         idx = next;
       }
       // Бот игры сломан (хороший не выигрывает нигде или проигрывает там, где бездействие выигрывает):
@@ -952,8 +1003,10 @@
         chosen = (easier.length ? easier : list)[0] || null;
       }
       // Подбор не справился: упёрлись в край и баланс всё ещё не в цели, наугад выигрывает или цель набирается в разминке.
-      var failedTune = !!chosen && (chosen.tooEasy || chosen.tooHard || chosen.randomWon || chosen.warmupLeak);
-      return chosen ? { failed: failedTune, warmupLeak: !!chosen.warmupLeak, factor: chosen.factor, lives: chosen.lives, timeLimitSec: chosen.timeLimitSec, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
+      var failedTune = !!chosen && (chosen.tooEasy || chosen.tooHard || chosen.randomWon || chosen.warmupLeak || chosen.stallBound);
+      // При зацикливании множитель не подбирается: оставляем исходные числа и отмечаем провал.
+      if (chosen && chosen.stallBound) chosen = { factor: 1, lives: baseLives, timeLimitSec: baseTime, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, stallBound: true };
+      return chosen ? { failed: failedTune, warmupLeak: !!chosen.warmupLeak, stall: !!chosen.stallBound, factor: chosen.factor, lives: chosen.lives, timeLimitSec: chosen.timeLimitSec, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
     } catch (e) {
       reportError(e, "tune");
       return null;
