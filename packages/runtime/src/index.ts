@@ -60,7 +60,8 @@ export interface PhaserKitConfig extends KitConfig {
   music?: string;
 }
 
-const PHASER_CSS = `#gg-root{position:fixed;inset:0}#gg-root canvas{display:block}
+const PHASER_CSS = `#gg-root{position:fixed;inset:0;z-index:1}#gg-root canvas{display:block}
+.gg-backdrop{position:fixed;inset:-40px;z-index:0;background:var(--gg-bg) center/cover no-repeat;filter:blur(28px) brightness(.75)}
 .gg-mute{position:fixed;z-index:15;top:calc(var(--gg-frame-y) + 8px*var(--gg-k));right:calc(var(--gg-frame-x) + 8px*var(--gg-k));width:calc(36px*var(--gg-k));height:calc(36px*var(--gg-k));border:0;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:calc(17px*var(--gg-k));line-height:1;cursor:pointer;touch-action:manipulation}`;
 
 /** Документ игры на Phaser: движок, наш рантайм, конфиг, код сцены. Всё встроено, внешних ресурсов нет. */

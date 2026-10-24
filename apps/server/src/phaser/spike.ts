@@ -44,7 +44,10 @@ What makes it fun (design for this, not for "a tap test"):
 - Progression inside the round: difficulty ramps in waves or levels (faster, more enemies, new obstacle type), with a visible "Уровень 2" / "Волна 3" moment.
 - Variety: 2-3 kinds of objects (e.g. normal enemy + fast enemy + bonus), at least one power-up or special item.
 - Juice: every action has feedback (pop, particles, screen shake on hit, floating "+10", combo counter).
-- Fair challenge for the audience: forgiving for kids and seniors, punchy for teens and adults.
+- Real stakes (the most common failure is a game nobody can lose): mistakes must cost something (a life, time, the combo), danger can reach the player, a careless player should lose the first try. Forgiving for kids and seniors means slower and bigger, not riskless.
+- Goal in countable objects or events ("поймай 25 фруктов", "сбей 30 банок"), never in raw points inflated by multipliers. Set it at ~60-70% of what an average player achieves in the round, and the round time at ~1.3× of a clean run. Reaching the goal ends the round with a win right away.
+- Levels are tied to goal progress (level 2 at 1/3 of the goal, level 3 at 2/3) so a winning player sees all of them; each level adds a NEW object or rule, not only more speed. The last stretch is a final wave or a boss.
+- Power-ups are rare (at most one every ~15 s) and clearly change play for a few seconds.
 - Portrait phone screen, one finger: tap, drag or swipe. No multi-touch, no hover. Round 30-180 seconds.
 
 Fields:
@@ -53,9 +56,9 @@ Fields:
 - Keep the user's specific ideas; explicit user requirements go to mustHave (0-5 short, testable items).
 - Every text field in the user's language. howToPlay: ONE short line for the start screen (max ~90 characters).
 - winCondition and loseCondition: concrete and reachable within the round. A game always ends.
-- concept and coreMechanic: concrete enough for a programmer, including the progression (what changes at level 2 and 3).
+- concept and coreMechanic: concrete enough for a programmer, including the goal count, what costs a life/time, what NEW thing appears at level 2 and 3, and the final wave/boss.
 - palette: four CSS hex colors matching the art; text must contrast with background.
-- sprites: 3-6 key objects that deserve illustrated art: the player, enemies/obstacles of each kind, the collectible, the power-up, the projectile if any. Not UI, not background, not tiny particles. key: short lowercase id; description: vivid visual description in English for an illustrator (object only, consistent art style, no background); fallback: one similar emoji.
+- sprites: 3-6 key objects that deserve illustrated art: the player, enemies/obstacles of each kind, the collectible, the power-up, the projectile if any. Not UI, not background, not tiny particles. key: short lowercase id; description: vivid visual description in English for an illustrator (object only, consistent art style, no background; projectiles: "vertical, pointing up"; enemy projectiles bright and glowing, clearly different from the player's); fallback: one similar emoji.
 - background: ONE full-screen portrait background scene in English for an illustrator that matches the theme (e.g. "sunny cartoon farm field with a wooden fence and distant hills"). No characters, no text, no UI; keep the middle area simple so gameplay objects stay readable.
 - music: mood of the background loop: happy (bright, kids/casual), calm (seniors, puzzles), tense (action, shooters).
 - No real-money mechanics, no gore, no violence for kids, no copyrighted characters by name.
@@ -78,17 +81,28 @@ GG.run(GameScene);
 Canvas: ${720}x${1280} logical pixels, portrait (GG.W, GG.H). Origin top-left. Arcade physics is on with zero gravity (set this.physics.world.gravity.y or body.setGravityY for platformers/jumps).
 
 Textures (already loaded, use by key; never load anything):
-- every sprite key from the spec (illustrated PNG-like art up to 256px, trimmed, aspect ratio varies): always size them with setDisplaySize(w, h) or setScale to the intended gameplay size;
-- "bg" (only if the spec says hasBackground: true): full background art, add first: this.add.image(360, 640, 'bg').setDisplaySize(720, 1280). For runners/shooters scroll it: this.add.tileSprite(360, 640, 720, 1280, 'bg').setTileScale(720 / this.textures.get('bg').getSourceImage().width) and change tilePositionY/X in update;
-- "spark": soft white radial dot for particles and glows (tint it);
+- every sprite key from the spec: illustrated art fitted into a transparent 256x256 SQUARE. Size it with setDisplaySize(s, s) (equal sides, never stretch). The art does not fill the whole square, so for a fair hitbox use obj.body.setCircle(90, 38, 38) (texture units) or obj.body.setSize(170, 170);
+- "bg": the 720x1280 background (always exists: illustrated art or a palette gradient). Static scenes: this.add.image(360, 640, 'bg'). Never scroll 'bg' itself;
+- "bgLoop": a seamless 720x2560 vertical loop of the background. For runners, jumpers and shooters: this.bgScroll = this.add.tileSprite(360, 640, 720, 1280, 'bgLoop'); then this.bgScroll.tilePositionY -= speed * delta / 1000 in update;
+- "spark": soft white radial dot for extra glows (tint it);
 - "px": white 8x8 square for rectangles, bars, platforms (setDisplaySize + setTint).
 
 GG API:
 - GG.score (read/write), GG.addScore(n), GG.best.
-- GG.win(message) / GG.lose(message): call exactly once when the round ends; the runtime freezes the scene and shows the result. Stop spawning after that.
-- GG.sfx(name): tap, pop, coin, jump, hit, explode, shoot, powerup, levelup, win, lose.
+- GG.win(message) / GG.lose(message): call exactly once when the round ends; the runtime plays the win/lose sound, freezes the scene after a short moment and shows the result with the score. message is one short line WITHOUT the score (e.g. 'Все 25 фруктов в корзине!'). Stop spawning after that.
+- GG.sfx(name): tap, pop, coin, jump, hit, explode, shoot, powerup (do not play win/lose: the runtime does).
 - GG.vibrate(ms), GG.palette {background, primary, accent, text} (hex strings; convert with Phaser.Display.Color.HexStringToColor(hex).color for tints), GG.speed (multiply all speeds and spawn rates by it), GG.uiScale, GG.font (font family for every text).
 - GG.storage.get(key) → Promise<string|null>, GG.storage.set(key, value) for small saves.
+
+GG.fx — ready-made juice with tuned sizes and timings. Use these instead of hand-made particles, banners and flashes:
+- GG.fx.burst(x, y, color, count?) — spark explosion on hit, collect, death;
+- GG.fx.float(x, y, '+10', color?) — floating text that rises and fades;
+- GG.fx.hit(obj, color?) — hit a target: 60 ms hitstop, sparks, the object flies off spinning and is destroyed (do not destroy it yourself);
+- GG.fx.shake('light' | 'medium' | 'heavy') — light on hit, medium on damage, heavy on explosion or boss;
+- GG.fx.flash(color?) — only for big moments (power-up, boss down); the runtime limits it;
+- GG.fx.banner('Уровень 2!') — level/wave banner in the upper third, plays its own sound;
+- GG.fx.pop(obj) — spawn animation (grows from 0 to its current scale); returns obj;
+- GG.fx.squash(obj) — squash & stretch on landing or catching.
 
 Phaser 3.90 API that works (prefer these exact forms):
 - this.physics.add.image(x, y, key) / this.physics.add.sprite; .setVelocity(vx, vy), .setCollideWorldBounds(true), .setBounce(1), .setImmovable(true), .setDrag(), .body.setCircle(r), .body.setSize(w, h) (in unscaled texture pixels).
@@ -103,13 +117,20 @@ Phaser 3.90 API that works (prefer these exact forms):
 - input: this.input.on('pointerdown', (p) => ...), 'pointermove' (p.isDown for drag), 'pointerup'; p.x/p.y are game coordinates. Swipe = compare pointerdown and pointerup positions (> 60px). Draggable: obj.setInteractive({ draggable: true }); this.input.on('drag', (p, obj, x, y) => { obj.x = x; obj.y = y; }). Keyboard is optional extra.
 - depth: setDepth; random: Phaser.Math.Between(a, b), Phaser.Math.FloatBetween, Phaser.Utils.Array.GetRandom(arr); clamp: Phaser.Math.Clamp.
 
-Make it feel like a hit Flash game (all of these are required):
-- Spawn animations (tween scale from 0), death/collect particles, camera shake on damage, white flash on big events, floating "+N" text that rises and fades, a combo or streak counter if it fits.
-- Difficulty ramps: waves or levels every ~15-25 seconds or N points; show a big centered banner ("Уровень 2!") tweened in and out with GG.sfx('levelup').
-- At least 2 kinds of objects plus a power-up or bonus as the spec describes; use the illustrated sprites for them.
-- Background: the 'bg' art if present, otherwise a gradient (two big rectangles or graphics) plus subtle moving decorations (parallax dots, clouds from 'spark').
-- HUD drawn by you at the top (score, lives or timer, level), readable, with stroke; keep the top-right 100x100 corner free (mute button there).
-- Idle animation on the player (gentle bob or breathing tween) so the screen is alive.
+Balance and stakes (most important; a game nobody can lose is a failure):
+- Track the goal in countable objects or events from the spec (caught, hit, reached), show it as "12 / 25" with a progress bar, and call GG.win(...) the moment it is reached. GG.score is for the record and can include bonuses, but never decides the win.
+- Mistakes cost: missing, getting hit or letting something through takes a life, time or the combo, with GG.fx.shake('medium') and GG.sfx('hit'). Danger must be able to reach the player; no spawn-protection zones around the player beyond 1 s of invulnerability after a hit.
+- No random-spam strategy: if tapping everywhere would work, add a cost for misses.
+- Levels switch on goal progress (1/3 and 2/3 of the goal), not on a clock; each level adds a NEW object or rule (new enemy type, moving obstacle, faster pattern) and shows GG.fx.banner. The last third is a final wave or a boss.
+- Power-ups at most once every ~15 s, lasting a few seconds, with a visible timer or glow on the player.
+- The round timer (if any) is ~1.3× of a clean run; when it ends without the goal, GG.lose(...).
+
+Make it feel like a hit Flash game (all required):
+- Every spawn uses GG.fx.pop; every hit/collect uses GG.fx.hit or GG.fx.burst + GG.fx.float('+N'); damage uses GG.fx.shake('medium'); a combo or streak counter if it fits.
+- At least 2 kinds of objects plus a power-up, using the illustrated sprites.
+- The player reacts: idle bob or breathing tween, GG.fx.squash on landing/catching, a tilt toward the movement direction.
+- Enemy projectiles are bright and readable: at least 28px, with a tinted 'spark' glow, clearly different from the player's.
+- HUD drawn by you at the top (goal progress, lives or timer, level), readable, with stroke, fully opaque; keep the top-right 100x100 corner free (mute button there).
 
 Hard rules:
 - Initialize ALL round state inside create() (properties on this), never in the constructor or at top level: the scene restarts every round. Do not reset GG.score yourself (the runtime does).
@@ -125,7 +146,7 @@ function codeUser(spec: PhaserSpec, hasBackground: boolean) {
   const p = AUDIENCE_PROFILES[spec.audience];
   const patterns = patternsFor(spec.genre);
   return `Game spec (JSON):
-${JSON.stringify({ ...spec, hasBackground }, null, 2)}
+${JSON.stringify(spec, null, 2)}
 
 Audience profile "${p.label}" (sizes in 720px canvas units):
 - Minimum tap target: ${p.minTapTargetPx * 2}px, minimum font: ${p.minFontPx * 2}px.

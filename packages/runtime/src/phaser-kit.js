@@ -25,11 +25,13 @@
 
   // ---------- ошибки ----------
   var errorShown = false;
+  /** Ошибка до конца самопроверки: игра не запускается. Ошибка во время раунда не блокирует «Ещё раз». */
   var failed = false;
+  var readyDone = false;
   var reported = {};
   var reportCount = 0;
   function reportError(err, where) {
-    failed = true;
+    if (!readyDone) failed = true;
     var message = (where ? where + ": " : "") + ((err && err.message) || String(err));
     var key = message;
     if (!reported[key] && reportCount < 5) {
@@ -226,7 +228,7 @@
       card.appendChild(el("h1", "gg-title", kind === "won" ? "Победа!" : "Игра окончена"));
       if (message) card.appendChild(el("p", "gg-text", message));
       card.appendChild(el("p", "gg-score", "Счёт: " + score));
-      card.appendChild(el("p", "gg-sub", score >= best && score > 0 ? "Новый рекорд!" : "Рекорд: " + best));
+      card.appendChild(el("p", "gg-sub", newRecord ? "Новый рекорд!" : "Рекорд: " + best));
     }
     var btn = el("button", "gg-btn", kind === "start" ? "Играть" : kind === "paused" ? "Продолжить" : "Ещё раз");
     var shownAt = Date.now();
@@ -265,7 +267,7 @@
     return game && game.scene.getScene("game");
   }
   function startRound() {
-    if (failed) return;
+    if (failed || state === "playing") return;
     score = 0;
     activeMs = 0;
     hideOverlay();
@@ -274,18 +276,24 @@
     setState("playing");
     startMusic();
   }
+  var newRecord = false;
   function finish(won, message) {
     if (state !== "playing") return;
+    newRecord = score > best;
     best = Math.max(best, score);
     storage.set("best", String(best));
     setState(won ? "won" : "lost");
     stopMusic();
     (won ? SFX.win : SFX.lose)();
     vibrate(won ? [30, 40, 30] : 120);
+    if (won) fx.burst(W / 2, H * 0.45, null, 40);
     var sc = gameScene();
-    // Даём кадру с последним эффектом дорисоваться, потом замораживаем сцену.
-    setTimeout(function () { if (sc && state !== "playing") sc.scene.pause(); }, 350);
-    showOverlay(won ? "won" : "lost", message);
+    // Финальные частицы и вспышка видны: сцена живёт ещё 800 мс, потом замирает под карточкой.
+    setTimeout(function () {
+      if (state === "playing") return;
+      if (sc) sc.scene.pause();
+      showOverlay(won ? "won" : "lost", message);
+    }, 800);
   }
   function pauseGame() {
     if (state !== "playing") return;
@@ -328,7 +336,43 @@
   function makeTextures(scene) {
     var tx = scene.textures;
     var sprites = cfg.sprites || {};
-    for (var key in images) tx.addImage(key, images[key]);
+    // Спрайты вписываются в прозрачный квадрат 256×256: setDisplaySize(s, s) никогда не сплющивает картинку.
+    for (var key in images) {
+      if (key === "bg") continue;
+      var im = images[key];
+      var sq = tx.createCanvas(key, 256, 256);
+      var k2 = Math.min(256 / im.naturalWidth, 256 / im.naturalHeight);
+      var dw = im.naturalWidth * k2, dh = im.naturalHeight * k2;
+      sq.getContext().drawImage(im, (256 - dw) / 2, (256 - dh) / 2, dw, dh);
+      sq.refresh();
+    }
+    // Фон есть всегда: картинка ИИ или вертикальный градиент палитры.
+    var bgSrc = images.bg;
+    if (!bgSrc) {
+      var gc = document.createElement("canvas");
+      gc.width = W;
+      gc.height = H;
+      var gx = gc.getContext("2d");
+      var gr = gx.createLinearGradient(0, 0, 0, H);
+      gr.addColorStop(0, cfg.palette.background);
+      gr.addColorStop(1, cfg.palette.primary);
+      gx.fillStyle = gr;
+      gx.fillRect(0, 0, W, H);
+      bgSrc = gc;
+    }
+    var bgc = tx.createCanvas("bg", W, H);
+    bgc.getContext().drawImage(bgSrc, 0, 0, W, H);
+    bgc.refresh();
+    // bgLoop: фон и его зеркальная копия по вертикали — бесшовная лента для прокрутки tileSprite.
+    var loop = tx.createCanvas("bgLoop", W, H * 2);
+    var lc = loop.getContext();
+    lc.drawImage(bgSrc, 0, 0, W, H);
+    lc.save();
+    lc.translate(0, H * 2);
+    lc.scale(1, -1);
+    lc.drawImage(bgSrc, 0, 0, W, H);
+    lc.restore();
+    loop.refresh();
     for (var k in sprites) {
       if (tx.exists(k)) continue;
       var c = tx.createCanvas(k, 256, 256);
@@ -369,6 +413,104 @@
     } catch (e) {}
   }
 
+  var sfxLast = {};
+
+  // ---------- готовые эффекты: размеры и частота заданы здесь, а не на глаз в коде модели ----------
+  var calmAudience = false; // kids и seniors: без резких вспышек
+  var lastFlash = 0;
+  function sceneNow() {
+    var sc = gameScene();
+    return sc && sc.sys.isActive() ? sc : null;
+  }
+  function tintOf(c) {
+    if (typeof c === "number") return c;
+    var hex = typeof c === "string" ? c : cfg.palette.accent;
+    try { return window.Phaser.Display.Color.HexStringToColor(hex).color; } catch (e) { return 0xffffff; }
+  }
+  var fx = {
+    /** Разлёт искр: попадание, сбор, взрыв. */
+    burst: function (x, y, color, count) {
+      var sc = sceneNow();
+      if (!sc) return;
+      var n = Math.min(count || 18, 60);
+      sc.add
+        .particles(x, y, "spark", { speed: { min: 160, max: 520 }, scale: { start: 1.1, end: 0 }, lifespan: { min: 350, max: 650 }, tint: [tintOf(color), 0xffffff], blendMode: "ADD", emitting: false })
+        .setDepth(40)
+        .explode(n);
+    },
+    /** Всплывающий текст «+10» над местом события. */
+    float: function (x, y, text, color) {
+      var sc = sceneNow();
+      if (!sc) return;
+      var t = sc.add
+        .text(x, y, String(text), { fontFamily: GG.font, fontSize: Math.round(46 * Math.min(cfg.uiScale, 1.4)) + "px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 8 })
+        .setOrigin(0.5)
+        .setDepth(45);
+      sc.tweens.add({ targets: t, y: y - 120, alpha: 0, scale: 1.25, duration: 750, ease: "Cubic.Out", onComplete: function () { t.destroy(); } });
+    },
+    /** Попадание по объекту: короткая остановка (hitstop), искры, отлёт с вращением; объект удаляется. */
+    hit: function (obj, color) {
+      var sc = sceneNow();
+      if (!sc || !obj || !obj.active) return;
+      fx.burst(obj.x, obj.y, color, 16);
+      if (obj.body) obj.body.enable = false;
+      sc.physics.world.pause();
+      sc.time.delayedCall(60, function () { if (sc.sys.isActive()) sc.physics.world.resume(); });
+      sc.tweens.add({ targets: obj, scale: (obj.scale || 1) * 1.35, angle: (obj.angle || 0) + window.Phaser.Math.Between(-200, 200), alpha: 0, y: obj.y - 60, duration: 320, ease: "Quad.Out", onComplete: function () { obj.destroy(); } });
+    },
+    /** Тряска камеры: light — касание, medium — урон, heavy — взрыв. */
+    shake: function (level) {
+      var sc = sceneNow();
+      if (!sc) return;
+      var k = level === "heavy" ? [260, 0.02] : level === "medium" ? [170, 0.011] : [90, 0.005];
+      sc.cameras.main.shake(k[0], calmAudience ? k[1] * 0.5 : k[1]);
+    },
+    /** Вспышка экрана для больших событий: не дольше 150 мс и не чаще раза в 3 с; для детей и пожилых — мягкий пульс. */
+    flash: function (color) {
+      var sc = sceneNow();
+      var now = Date.now();
+      if (!sc || now - lastFlash < 3000) return;
+      lastFlash = now;
+      var c = window.Phaser.Display.Color.IntegerToColor(tintOf(color || "#ffffff"));
+      if (!calmAudience) return sc.cameras.main.flash(140, c.red, c.green, c.blue);
+      var pulse = sc.add.rectangle(W / 2, H / 2, W, H, tintOf(color || "#ffffff"), 0.22).setDepth(47);
+      sc.tweens.add({ targets: pulse, alpha: 0, duration: 380, ease: "Quad.Out", onComplete: function () { pulse.destroy(); } });
+    },
+    /** Баннер «Уровень 2!»: верхняя треть под HUD, не закрывает игровую зону, около секунды. */
+    banner: function (text, color) {
+      var sc = sceneNow();
+      if (!sc) return;
+      var y = H * 0.2;
+      var bg = sc.add.rectangle(W / 2, y, W, 120, 0x000000, 0.45).setDepth(48);
+      var t = sc.add
+        .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "64px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 10 })
+        .setOrigin(0.5)
+        .setDepth(49);
+      bg.scaleY = 0;
+      t.setScale(0.4).setAlpha(0);
+      sc.tweens.add({ targets: bg, scaleY: 1, duration: 160, ease: "Quad.Out" });
+      sc.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 260, ease: "Back.Out" });
+      sc.tweens.add({ targets: [t, bg], alpha: 0, delay: 800, duration: 220, onComplete: function () { t.destroy(); bg.destroy(); } });
+      SFX.levelup();
+    },
+    /** Появление объекта: вырастает из нуля до своего размера. */
+    pop: function (obj) {
+      var sc = sceneNow();
+      if (!sc || !obj) return obj;
+      var sx = obj.scaleX, sy = obj.scaleY;
+      obj.setScale(0);
+      sc.tweens.add({ targets: obj, scaleX: sx, scaleY: sy, duration: 240, ease: "Back.Out" });
+      return obj;
+    },
+    /** Сплющивание при приземлении или поимке (squash & stretch). */
+    squash: function (obj) {
+      var sc = sceneNow();
+      if (!sc || !obj) return;
+      var sx = obj.scaleX, sy = obj.scaleY;
+      sc.tweens.add({ targets: obj, scaleX: sx * 1.25, scaleY: sy * 0.78, duration: 70, yoyo: true, ease: "Quad.Out", onComplete: function () { obj.setScale(sx, sy); } });
+    },
+  };
+
   // ---------- публичный API для кода игры ----------
   var GG = {
     W: W,
@@ -385,7 +527,15 @@
     addScore: function (n) { score = Math.max(0, score + Math.floor(n == null ? 1 : n)); },
     win: function (message) { finish(true, message); },
     lose: function (message) { finish(false, message); },
-    sfx: function (name) { var f = SFX[name]; if (f) f(); },
+    sfx: function (name) {
+      if (name === "win" || name === "lose") return; // их играет рантайм в finish
+      var f = SFX[name];
+      var now = Date.now();
+      if (!f || now - (sfxLast[name] || 0) < (name === "shoot" ? 140 : 50)) return;
+      sfxLast[name] = now;
+      f();
+    },
+    fx: fx,
     vibrate: vibrate,
     storage: storage,
     hasImage: function (key) { return !!images[key]; },
@@ -405,6 +555,10 @@
       root.style.setProperty("--gg-accent", cfg.palette.accent);
       root.style.setProperty("--gg-text", cfg.palette.text);
       root.style.setProperty("--gg-ui", String(cfg.uiScale));
+      calmAudience = cfg.uiScale >= 1.3 || cfg.calm === true;
+      var backdrop = el("div", "gg-backdrop");
+      if (typeof cfg.background === "string" && cfg.background.indexOf("data:image/") === 0) backdrop.style.backgroundImage = "url(" + cfg.background + ")";
+      document.body.appendChild(backdrop);
       overlay = el("div", "gg-overlay");
       document.body.appendChild(overlay);
       muteBtn = el("button", "gg-mute", "🔊");
@@ -464,9 +618,13 @@
           if (!gameScene() || !gameScene().sys.isActive()) return;
           frames++;
           if (frames === 20) {
+            if (failed) return game.events.off("postrender", onFrame);
+            gameScene().scene.restart();
+          } else if (frames === 23) {
             game.events.off("postrender", onFrame);
             if (failed) return;
             gameScene().scene.pause();
+            readyDone = true;
             post({ type: "frame", painted: true });
             post({ type: "ready" });
             showOverlay("start");
