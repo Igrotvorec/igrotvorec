@@ -162,7 +162,7 @@ export function Build({
             {spec.sprites && spec.sprites.length > 0 && (
               <div>
                 {/* Описания спрайтов — английский промпт для модели картинок, в интерфейсе только значки. */}
-                <div className="field-label">{failed ? "Спрайты" : "Спрайты рисуются параллельно с кодом"}</div>
+                <div className="field-label">{failed ? "Спрайты" : spec.background ? "Фон и спрайты рисуются параллельно с кодом" : "Спрайты рисуются параллельно с кодом"}</div>
                 <div className="sprite-row" aria-hidden>
                   {spec.sprites.map((s) => (
                     <span key={s.key}>{s.fallback}</span>
