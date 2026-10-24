@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { renameSync } from "node:fs";
-import { RUNTIME_MARK, assembleGame } from "@gg/runtime";
+import { RUNTIME_MARK } from "@gg/runtime";
 import { gamePath, getVersion } from "./db";
-import { kitConfig } from "./pipeline";
+import { assembleVersion } from "./pipeline";
 
 /** Опубликованный файл заменяется только целиком: уникальный временный файл на каждого писателя и rename. */
 export async function writeAtomic(path: string, content: string) {
@@ -16,10 +16,10 @@ export async function writeAtomic(path: string, content: string) {
   }
 }
 
-/** Собирает HTML версии заново с текущим рантаймом из кода, спеки и спрайтов в БД. */
+/** Собирает HTML версии заново с текущим рантаймом её движка из кода, спеки и картинок в БД. */
 export function rebuildHtml(versionId: string): string | null {
   const v = getVersion(versionId);
-  return v ? assembleGame(kitConfig(v.spec, v.assets), v.code, v.spec.language) : null;
+  return v ? assembleVersion(v.spec, v.assets, v.code) : null;
 }
 
 /**
@@ -32,8 +32,6 @@ export async function currentHtml(versionId: string): Promise<string | null> {
   if (!(await file.exists())) return null;
   const html = await file.text();
   if (html.includes(RUNTIME_MARK)) return html;
-  // Эксперимент с Phaser: такие игры собираются своим сборщиком, kit-пересборка их сломала бы.
-  if (html.includes('<meta name="gg-engine" content="phaser">')) return html;
   const fresh = rebuildHtml(versionId);
   if (!fresh) return html;
   await writeAtomic(gamePath(versionId), fresh);

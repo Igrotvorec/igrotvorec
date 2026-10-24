@@ -1,12 +1,11 @@
 /**
- * Эксперимент с Phaser: генерирует игры по промптам, прогоняет их в Chrome и сохраняет скриншоты.
+ * Проверка рантайма Phaser без LLM: ручная сцена собирается, публикуется и прогоняется в Chrome.
+ * Генерация игр на Phaser идёт через основной пайплайн (tools/bench.ts, интерфейс).
  *
- *   DATA_DIR=./data-demo bun --env-file=.env tools/phaser-spike.ts "промпт 1" "промпт 2" ...
- *   DATA_DIR=./data-demo bun --env-file=.env tools/phaser-spike.ts --smoke   # ручная сцена, без LLM
+ *   DATA_DIR=./data-demo bun --env-file=.env tools/phaser-spike.ts
  */
 import { assemblePhaserGame } from "../packages/runtime/src/index";
 import { addVersion, createGame } from "../apps/server/src/db";
-import { generatePhaserGame } from "../apps/server/src/phaser/spike";
 import { tryGame } from "./try-game";
 
 const BASE = process.env.BASE ?? "http://localhost:8787";
@@ -46,26 +45,8 @@ async function smoke() {
     SMOKE,
   );
   const gameId = createGame("[phaser smoke]", false);
-  await addVersion({ gameId, baseVersionId: null, kind: "create", spec: { title: "Проверка Phaser", audience: "general", genre: "arcade", concept: "-", coreMechanic: "-", controls: "-", howToPlay: "-", winCondition: "-", loseCondition: "-", mustHave: [], palette: { background: "#1d3557", primary: "#ffd34d", accent: "#e63946", text: "#ffffff" }, difficulty: "normal", roundSeconds: 60, language: "ru", sprites: [] }, code: SMOKE, assets: {}, html, instruction: "[phaser smoke]", model: "handcrafted+phaser", genMs: 0 });
+  await addVersion({ gameId, baseVersionId: null, kind: "create", spec: { engine: "phaser", title: "Проверка Phaser", audience: "general", genre: "arcade", concept: "-", coreMechanic: "-", controls: "-", howToPlay: "-", winCondition: "-", loseCondition: "-", mustHave: [], palette: { background: "#1d3557", primary: "#ffd34d", accent: "#e63946", text: "#ffffff" }, difficulty: "normal", roundSeconds: 60, language: "ru", sprites: [] }, code: SMOKE, assets: {}, html, instruction: "[phaser smoke]", model: "handcrafted+phaser", genMs: 0 });
   console.log(`smoke ${gameId}`, JSON.stringify(await tryGame(gameId, OUT, BASE)));
 }
 
-if (process.argv[2] === "--smoke") await smoke();
-else {
-  const prompts = process.argv.slice(2);
-  await Promise.all(
-    prompts.map(async (prompt) => {
-      const ac = new AbortController();
-      setTimeout(() => ac.abort(new Error("timeout")), 300_000);
-      try {
-        const r = await generatePhaserGame(prompt, ac.signal, (m) => console.log(`[${prompt.slice(0, 24)}] ${m}`));
-        const play = await tryGame(r.gameId, OUT, BASE);
-        console.log(
-          `ГОТОВО «${r.spec.title}» ${r.gameId}: ${(r.ms.total / 1000).toFixed(0)} с (спека ${(r.ms.spec / 1000).toFixed(0)}, код ${(r.ms.code / 1000).toFixed(0)}), исправлений ${r.fixes}, спрайтов ${r.sprites}/${r.spec.sprites.length}, фон ${r.background ? "да" : "нет"}, ${(r.bytes / 1024).toFixed(0)} КБ; запуск: ready=${play.ready} ошибки=${play.errors.length ? play.errors.join(" | ") : "нет"}`,
-        );
-      } catch (e) {
-        console.log(`ОШИБКА [${prompt}]: ${(e as Error).message}`);
-      }
-    }),
-  );
-}
+await smoke();

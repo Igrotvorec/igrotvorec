@@ -9,6 +9,8 @@ export type Genre = (typeof GENRES)[number];
 export const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const HexColor = z.string().regex(HEX_COLOR);
 
+export const MUSIC_MOODS = ["happy", "calm", "tense"] as const;
+
 export const GameSpecSchema = z.object({
   title: z.string().min(1).max(40),
   audience: z.enum(AUDIENCES),
@@ -40,9 +42,16 @@ export const GameSpecSchema = z.object({
         fallback: z.string().min(1).max(8),
       }),
     )
-    .max(3),
+    .max(6),
+  /** Движок версии: phaser — новые игры, kit — прежний маленький рантайм (старые игры). Нет поля — kit. */
+  engine: z.enum(["kit", "phaser"]).optional(),
+  /** Описание фона сцены для иллюстратора (Phaser). */
+  background: z.string().max(400).optional(),
+  /** Настроение фоновой музыки (Phaser). */
+  music: z.enum(MUSIC_MOODS).optional(),
 });
 export type GameSpec = z.infer<typeof GameSpecSchema>;
+export type GameEngine = NonNullable<GameSpec["engine"]>;
 
 /** JSON-схема spec для structured output LLM. Синхронизируется с GameSpecSchema вручную. */
 const gameSpecJsonSchema = {
@@ -107,3 +116,14 @@ export const specResponseJsonSchema = {
     spec: gameSpecJsonSchema,
   },
 } as const;
+
+/** Спека игры на Phaser: та же схема плюс фон и музыка (strict-режим требует их в required). */
+export const phaserSpecResponseJsonSchema = (() => {
+  const s = JSON.parse(JSON.stringify(specResponseJsonSchema)) as {
+    properties: { spec: { required: string[]; properties: Record<string, unknown> } };
+  };
+  s.properties.spec.properties.background = { type: "string" };
+  s.properties.spec.properties.music = { type: "string", enum: [...MUSIC_MOODS] };
+  s.properties.spec.required.push("background", "music");
+  return s;
+})();
