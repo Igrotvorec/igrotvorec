@@ -11,6 +11,8 @@ export const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9
 const HexColor = z.string().regex(HEX_COLOR);
 
 export const MUSIC_MOODS = ["happy", "calm", "tense"] as const;
+/** Стиль HUD Phaser-игры: модель спеки выбирает под тему, чтобы игры не выглядели одинаково. */
+export const HUD_STYLES = ["chips", "corners", "themed-panel", "icon-meter"] as const;
 
 export const GameSpecSchema = z.object({
   title: z.string().min(1).max(40),
@@ -50,6 +52,8 @@ export const GameSpecSchema = z.object({
   background: z.string().max(400).optional(),
   /** Настроение фоновой музыки (Phaser). */
   music: z.enum(MUSIC_MOODS).optional(),
+  /** Стиль HUD (Phaser). */
+  hudStyle: z.enum(HUD_STYLES).optional(),
   /** Рецепт жанра из research/genre-recipes.json или "custom" (Phaser). */
   recipe: z.string().max(32).optional(),
   /** Итог автоподбора сложности ботами в превью автора (Phaser); factor умножает GG.speed. */
@@ -154,6 +158,7 @@ export const phaserSpecResponseJsonSchema = (() => {
   };
   s.properties.spec.properties.background = { type: "string" };
   s.properties.spec.properties.music = { type: "string", enum: [...MUSIC_MOODS] };
+  s.properties.spec.properties.hudStyle = { type: "string", enum: [...HUD_STYLES] };
   s.properties.spec.properties.recipe = { type: "string", enum: [...RECIPE_IDS, "custom"] };
   s.properties.spec.properties.balance = {
     type: "object",
@@ -167,6 +172,6 @@ export const phaserSpecResponseJsonSchema = (() => {
       spawnPerSec: { type: "number" },
     },
   };
-  s.properties.spec.required.push("background", "music", "recipe", "balance");
+  s.properties.spec.required.push("background", "music", "recipe", "balance", "hudStyle");
   return s;
 })();

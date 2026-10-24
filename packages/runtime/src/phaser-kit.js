@@ -667,14 +667,21 @@
     banner: function (text, color) {
       var sc = sceneNow();
       if (!sc || sim) return;
+      // Пилюля в цветах игры поверх полосы HUD: у каждой игры свой баннер, а не одна чёрная плашка на всех.
       var y = TOP / 2;
-      var bg = sc.add.rectangle(W / 2, y, W, TOP, 0x111318, 1).setDepth(150).setScrollFactor(0);
+      var fill = tintOf(cfg.palette.primary);
+      var ink = readableOn(cfg.palette.primary);
       var t = sc.add
-        .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "60px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 10 })
+        .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "56px", fontStyle: "bold", color: color || ink, stroke: ink === "#ffffff" ? "#000000" : "#ffffff", strokeThickness: 4 })
         .setOrigin(0.5)
         .setDepth(151)
         .setScrollFactor(0);
-      var fit = Math.min(1, 660 / Math.max(1, t.width));
+      var fit = Math.min(1, 600 / Math.max(1, t.width));
+      var bw = Math.min(W - 24, t.width * fit + 96), bh = 132;
+      var bg = sc.add.graphics().setDepth(150).setScrollFactor(0);
+      bg.fillStyle(tintOf(cfg.palette.accent), 1).fillRoundedRect(W / 2 - bw / 2 - 6, y - bh / 2 - 6, bw + 12, bh + 12, 72);
+      bg.fillStyle(fill, 1).fillRoundedRect(W / 2 - bw / 2, y - bh / 2, bw, bh, 66);
+      bg.setPosition(0, 0);
       bg.scaleY = 0;
       t.setScale(fit * 0.4).setAlpha(0);
       sc.tweens.add({ targets: bg, scaleY: 1, duration: 160, ease: "Quad.Out" });

@@ -40,6 +40,7 @@ Fields:
   - timeLimitSec: 0 (no timer) by default — difficulty comes from lives. Use 1.3-1.5 × cleanRunSec only when time pressure IS the game: quiz, hidden objects, racing, or the user asked "на время";
   - spawnPerSec: how many objects or threats appear per second at level 1 (a careless player can keep up at level 1).
   Levels and new threats begin only after the warm-up.
+- hudStyle: any of "chips", "corners", "themed-panel", "icon-meter" (the server may pick another one for variety).
 - recipe: the proven genre recipe closest to the request; its progression, object kinds and power-ups guide the design (keep the user's theme and ideas). "custom" only if none fits at all.
 ${recipeMenu()}
 - No real-money mechanics, no gore, no violence for kids, no copyrighted characters by name.
@@ -97,7 +98,7 @@ GG.fx — ready-made juice with tuned sizes and timings. Use these instead of ha
 - GG.fx.hit(obj, color?) — hit a target: 60 ms hitstop, sparks, the object flies off spinning and is destroyed (do not destroy it yourself). It becomes inactive immediately: skip it everywhere with GG.alive(obj) (taps, overlaps, counting, "missed" checks) so a tap on a dying object is never a miss;
 - GG.fx.shake('light' | 'medium' | 'heavy') — light on hit, medium on damage, heavy on explosion or boss;
 - GG.fx.flash(color?) — only for big moments (power-up, boss down); the runtime limits it;
-- GG.fx.banner('Уровень 2!') — level/wave banner over the HUD band for about a second (screen space, works with a moving camera, never covers the playfield), plays its own sound; keep the text short;
+- GG.fx.banner('Уровень 2!') — level/wave banner (a palette-colored pill over the HUD band for about a second; screen space, works with a moving camera, never covers the playfield), plays its own sound; keep the text short;
 - GG.fx.pop(obj) — spawn animation (grows from 0 to its current scale; call after setDisplaySize); returns obj;
 - GG.fx.squash(obj) — squash & stretch on landing or catching; safe to call often.
 - GG.hitbox(obj, k, shape?) and GG.alive(obj) — see above; shape 'circle' for round things and projectiles.
@@ -152,7 +153,12 @@ Make it feel like a hit Flash game (all required):
 - The player reacts: idle bob or breathing tween, GG.fx.squash on landing/catching, a tilt toward the movement direction.
 - Enemy projectiles are bright and readable: at least 28px, with a tinted 'spark' glow, clearly different from the player's.
 - Lives in the HUD: hearts while GG.lives ≤ 5, otherwise a compact "♥×N" (the runtime may raise lives during calibration).
-- HUD drawn by you in the top band y 0-200 only (goal progress, lives as hearts from GG.lives, timer, level), readable, with stroke, fully opaque, setDepth(100) so effects never cover it, setScrollFactor(0) if the camera moves; keep the top-right 100x100 corner free (mute button there). Spawn gameplay objects below y 220 or from beyond the screen edge, never under the HUD.
+- HUD drawn by you in the top band y 0-200 only (goal progress, lives as hearts from GG.lives, timer, level), readable, setDepth(100) so effects never cover it, setScrollFactor(0) if the camera moves. Style it by spec.hudStyle and the palette, never as a plain dark full-width bar (every game looking the same is a failure):
+  - "chips": 2-4 separate rounded chips (graphics.fillRoundedRect, radius 26+) with a palette-tinted fill and a lighter 3 px border, each with an icon (the goal sprite scaled to ~44 px, hearts) and a bold number; chips float with gaps, the scene stays visible between them.
+  - "corners": no panel; the goal counter huge (64-80 px) in the top-left with the goal sprite beside it, lives top-center, level small under the counter; thick dark stroke (10-12 px) and a soft shadow (setShadow) for readability over the scene.
+  - "themed-panel": one shaped panel in THIS game's own material and palette (space: dark metal with glowing cyan edges and rivets; candy: pink with white stripes; ocean: rope border on teal; farm: wooden planks; never a generic beige paper card), rounded or with notched corners.
+  - "icon-meter": progress as a row/arc of small goal icons that light up as they are collected (or a thick rounded meter with the goal sprite at its end); lives and level as small chips.
+  Text sizes follow the audience minimum; use the palette (text, primary, accent), not only white on black. keep the top-right 100x100 corner free (mute button there). Spawn gameplay objects below y 220 or from beyond the screen edge, never under the HUD.
 
 Hard rules:
 - Ball and bounce games: if the ball bounces off the paddle several times without hitting anything, nudge its angle or speed so it cannot loop forever.

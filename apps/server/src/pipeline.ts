@@ -2,6 +2,7 @@ import {
   AUDIENCE_PROFILES,
   GameSpecSchema,
   HEX_COLOR,
+  HUD_STYLES,
   MUSIC_MOODS,
   phaserSpecResponseJsonSchema,
   specResponseJsonSchema,
@@ -118,7 +119,7 @@ export function normalizeSpec(raw: unknown, maxSprites = 3): unknown {
   return r;
 }
 
-async function makeSpec(engine: GameEngine, system: string, user: string, signal: AbortSignal): Promise<GameSpec> {
+async function makeSpec(engine: GameEngine, system: string, user: string, signal: AbortSignal, keepHud = false): Promise<GameSpec> {
   const raw = await chatJson<{ allowed?: unknown; refusalReason?: unknown; spec?: unknown }>({
     model: config.specModel,
     system,
@@ -139,11 +140,15 @@ async function makeSpec(engine: GameEngine, system: string, user: string, signal
     norm.background = typeof norm.background === "string" && norm.background.trim() ? norm.background.slice(0, 400) : "soft gradient sky";
     if (!MUSIC_MOODS.includes(norm.music as (typeof MUSIC_MOODS)[number])) norm.music = "happy";
     norm.recipe = typeof norm.recipe === "string" ? norm.recipe.slice(0, 32) : "custom";
+    // Стиль HUD выбирается случайно, а не моделью: модель почти всегда брала «панель», и игры выглядели одинаково.
+    // При правке стиль сохраняется (EDIT_SPEC_SYSTEM просит оставить поля, а spec приходит из прошлой версии).
+    if (!HUD_STYLES.includes(norm.hudStyle as (typeof HUD_STYLES)[number]) || !keepHud) norm.hudStyle = HUD_STYLES[Math.floor(Math.random() * HUD_STYLES.length)];
     norm.balance = normalizeBalance(norm.balance);
   } else {
     delete norm.background;
     delete norm.music;
     delete norm.recipe;
+    delete norm.hudStyle;
   }
   const parsed = GameSpecSchema.safeParse(norm);
   if (!parsed.success) throw new Error(`Spec failed validation: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`);
@@ -221,7 +226,7 @@ export async function edit(gameId: string, instruction: string, emit: Emit, sign
   // Правка остаётся на движке версии: старую игру на kit не переписываем на Phaser незаметно.
   const engine = engineOf(current.spec);
   const P = ENGINES[engine].prompts;
-  const spec = await makeSpec(engine, P.EDIT_SPEC_SYSTEM, P.editSpecUser(current.spec, instruction), signal);
+  const spec = await makeSpec(engine, P.EDIT_SPEC_SYSTEM, P.editSpecUser(current.spec, instruction), signal, true);
   emit({ type: "spec", spec });
   // Картинки с теми же ключами и описанием (и фон с тем же описанием) берём из прошлой версии.
   const reuse: SpriteMap = {};
