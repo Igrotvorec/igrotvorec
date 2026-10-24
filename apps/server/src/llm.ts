@@ -20,12 +20,16 @@ export interface ChatOpts {
 }
 
 /**
- * service_tier (fast-режим) только для моделей GPT. Модели Claude (Opus) всегда идут без fast:
- * их fast оплачивается отдельно и дорого, поэтому защищаемся в коде, а не только настройкой .env.
+ * service_tier (fast-режим): для GPT из LLM_SERVICE_TIER; для Claude (Opus) только из отдельной
+ * CLAUDE_SERVICE_TIER, по умолчанию выключенной: fast у Opus оплачивается отдельно и дорого.
  */
-function tierFor(model: string): { service_tier?: "priority" } {
-  if (!config.serviceTier || model.startsWith("claude")) return {};
-  return { service_tier: config.serviceTier as "priority" };
+function tierFor(model: string): { service_tier?: "priority"; max_tokens?: number } {
+  if (model.startsWith("claude")) {
+    // Прокси без max_tokens обрезает ответ Claude на 8192 токенах — код игры на Opus длиннее.
+    const tier = process.env.CLAUDE_SERVICE_TIER;
+    return { max_tokens: 32_000, ...(tier ? { service_tier: tier as "priority" } : {}) };
+  }
+  return config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {};
 }
 
 export async function chatJson<T>(opts: ChatOpts & { schemaName: string; schema: object }): Promise<T> {
