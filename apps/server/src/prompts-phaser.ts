@@ -33,6 +33,13 @@ Fields:
 - sprites: 3-6 key objects that deserve illustrated art: the player, enemies/obstacles of each kind, the collectible, the power-up, the projectile if any. Not UI, not background, not tiny particles. key: short lowercase id; description: vivid visual description in English for an illustrator (object only, consistent art style, no background; projectiles: "vertical, pointing up"; enemy projectiles bright and glowing, clearly different from the player's); fallback: one similar emoji.
 - background: ONE full-screen portrait background scene in English for an illustrator that matches the theme (e.g. "sunny cartoon farm field with a wooden fence and distant hills"). No characters, no text, no UI; keep the middle area simple so gameplay objects stay readable. If the game scrolls vertically (jumper, shooter, falling or flying), describe a background WITHOUT a horizon or ground: open sky with clouds, starry space, underwater, an abstract texture.
 - music: mood of the background loop: happy (bright, kids/casual), calm (seniors, puzzles), tense (action, shooters).
+- balance (numbers, the code must use them):
+  - warmupSec: 6-12 s at the start when mistakes do not count (longer for kids and seniors);
+  - lives: 3-5 (more for kids and seniors); one mistake costs one life, so it is at most ~1/3 of the reserve;
+  - cleanRunSec: how long a good player needs to reach the goal (20-90 s);
+  - timeLimitSec: 1.3-1.5 × cleanRunSec when time pressure is part of the game, otherwise 0 (no timer);
+  - spawnPerSec: how many objects or threats appear per second at level 1 (a careless player can keep up at level 1).
+  Levels and new threats begin only after the warm-up.
 - recipe: the proven genre recipe closest to the request; its progression, object kinds and power-ups guide the design (keep the user's theme and ideas). "custom" only if none fits at all.
 ${recipeMenu()}
 - No real-money mechanics, no gore, no violence for kids, no copyrighted characters by name.
@@ -86,6 +93,15 @@ GG.fx — ready-made juice with tuned sizes and timings. Use these instead of ha
 - GG.fx.pop(obj) — spawn animation (grows from 0 to its current scale; call after setDisplaySize); returns obj;
 - GG.fx.squash(obj) — squash & stretch on landing or catching; safe to call often.
 - GG.hitbox(obj, k) and GG.alive(obj) — see above.
+- GG.fx.miss(x, y, text?) — a miss or a missed object: grey-red puff and "мимо", clearly different from a catch.
+
+Balance API (the runtime owns these rules; do not reimplement them):
+- GG.balance = { warmupSec, lives, cleanRunSec, timeLimitSec, spawnPerSec } from the spec. Use these numbers for the timer, lives and level-1 spawn rate; do not invent your own.
+- GG.lives — current lives (read it for the hearts in the HUD); the runtime sets it from GG.balance.lives each round.
+- GG.damage(reason) — call on EVERY player mistake (hit, missed object, fall, wrong tap). The runtime applies warm-up, forgives the first mistake after it, gives 0.9 s invulnerability, takes a life, and calls GG.lose itself when lives run out. It returns 'warmup' | 'forgiven' | 'invulnerable' | 'hit' | 'dead'; react visually only to 'hit' (blink the player) and stop the scene logic on 'dead'. Never count lives, warm-up or forgiveness yourself.
+- GG.setGoal(done, total, label) — call whenever goal progress changes; the result card shows it.
+- GG.recentlyHit(x, y) — true if GG.fx.hit happened there in the last 0.4 s: return early from a tap handler instead of counting a miss.
+- GG.top (200) — the bottom of the HUD band.
 
 Phaser 3.90 API that works (prefer these exact forms):
 - this.physics.add.image(x, y, key) / this.physics.add.sprite; .setVelocity(vx, vy), .setCollideWorldBounds(true), .setBounce(1), .setImmovable(true), .setDrag(), .body.setCircle(r), .body.setSize(w, h) (in unscaled texture pixels).
@@ -101,22 +117,24 @@ Phaser 3.90 API that works (prefer these exact forms):
 - depth: setDepth; random: Phaser.Math.Between(a, b), Phaser.Math.FloatBetween, Phaser.Utils.Array.GetRandom(arr); clamp: Phaser.Math.Clamp.
 
 Balance and stakes (most important; a game nobody can lose is a failure):
-- Track the goal in countable objects or events from the spec (caught, hit, reached), show it as "12 / 25" with a progress bar, and call GG.win(...) the moment it is reached. GG.score is for the record and can include bonuses, but never decides the win.
-- Mistakes cost: missing, getting hit or letting something through takes a life, time or the combo, with GG.fx.shake('medium') and GG.sfx('hit'). Danger must be able to reach the player; no spawn-protection zones around the player beyond 1 s of invulnerability after a hit.
+- Track the goal in countable objects or events from the spec (caught, hit, reached), show it as "12 / 25" with a progress bar, call GG.setGoal on every change and GG.win(...) the moment it is reached. GG.score is for the record and can include bonuses, but never decides the win.
+- Mistakes go through GG.damage(reason) (it shakes, plays the sound and handles lives). Danger must be able to reach the player.
 - No random-spam strategy: if tapping everywhere would work, add a cost for misses.
 - Levels switch on goal progress (1/3 and 2/3 of the goal), not on a clock; each level adds a NEW object or rule (new enemy type, moving obstacle, faster pattern) and shows GG.fx.banner. The last third is a final wave or a boss.
 - Power-ups at most once every ~15 s, lasting a few seconds, with a visible timer or glow on the player.
-- The round timer (if any) is at most ~1.5× of a clean run; otherwise drop the timer. When it ends without the goal, GG.lose(...).
-- Difficulty curve: the first ~10 s are a warm-up that cannot be lost, the first mistake is forgiven (a warning, not a loss), pressure grows toward level 2. Target: a careless player loses in about half of the attempts, and not before the middle of the round; an attentive player wins.
+- Timer: only if GG.balance.timeLimitSec > 0, counting down from it; when it ends without the goal, GG.lose(...). Otherwise no timer in the HUD.
+- Difficulty curve: level 1 runs at GG.balance.spawnPerSec, pressure grows toward level 2 after the warm-up. Target: a careless player loses in about half of the attempts, and not before the middle of the round; an attentive player wins.
 - Always passable: never permanently remove something the player needs to progress (a vanishing platform respawns, the next platform is always within jump height, there is always a way out). No soft locks where the player can only wait for the timer.
-- Threat before the finale: from level 2 enemies enter from beyond the screen edge, move and attack; danger is not saved for the boss only.
+- Threat before the finale: from level 2 (and never during the warm-up) enemies enter from beyond the screen edge, move and attack; danger is not saved for the boss only.
+- Playfield: objects appear and can be hit, caught or tapped only below GG.top + 20; player projectiles are destroyed when they reach GG.top; keep 40 px neutral margins at the left and right edges (nothing unreachable there).
+- Catching objects (basket, paddle, player that collects) get a generous hitbox: GG.hitbox(obj, 0.85), 0.9 for kids and seniors. Dangerous things use 0.6-0.7.
 
 Make it feel like a hit Flash game (all required):
 - Every spawn uses GG.fx.pop; every hit/collect uses GG.fx.hit or GG.fx.burst + GG.fx.float('+N'); damage uses GG.fx.shake('medium'); a combo or streak counter if it fits.
 - At least 2 kinds of objects plus a power-up, using the illustrated sprites.
 - The player reacts: idle bob or breathing tween, GG.fx.squash on landing/catching, a tilt toward the movement direction.
 - Enemy projectiles are bright and readable: at least 28px, with a tinted 'spark' glow, clearly different from the player's.
-- HUD drawn by you in the top band y 0-200 only (goal progress, lives or timer, level), readable, with stroke, fully opaque, setScrollFactor(0) if the camera moves; keep the top-right 100x100 corner free (mute button there). Spawn gameplay objects below y 220 or from beyond the screen edge, never under the HUD.
+- HUD drawn by you in the top band y 0-200 only (goal progress, lives as hearts from GG.lives, timer, level), readable, with stroke, fully opaque, setDepth(100) so effects never cover it, setScrollFactor(0) if the camera moves; keep the top-right 100x100 corner free (mute button there). Spawn gameplay objects below y 220 or from beyond the screen edge, never under the HUD.
 
 Hard rules:
 - Initialize ALL round state inside create() (properties on this), never in the constructor or at top level: the scene restarts every round. Do not reset GG.score yourself (the runtime does).

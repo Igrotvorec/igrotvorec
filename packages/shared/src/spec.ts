@@ -52,6 +52,16 @@ export const GameSpecSchema = z.object({
   music: z.enum(MUSIC_MOODS).optional(),
   /** Рецепт жанра из research/genre-recipes.json или "custom" (Phaser). */
   recipe: z.string().max(32).optional(),
+  /** Баланс числами (Phaser): код обязан брать значения отсюда (GG.balance). */
+  balance: z
+    .object({
+      warmupSec: z.number(),
+      lives: z.number().int(),
+      cleanRunSec: z.number(),
+      timeLimitSec: z.number(),
+      spawnPerSec: z.number(),
+    })
+    .optional(),
 });
 export type GameSpec = z.infer<typeof GameSpecSchema>;
 export type GameEngine = NonNullable<GameSpec["engine"]>;
@@ -128,6 +138,18 @@ export const phaserSpecResponseJsonSchema = (() => {
   s.properties.spec.properties.background = { type: "string" };
   s.properties.spec.properties.music = { type: "string", enum: [...MUSIC_MOODS] };
   s.properties.spec.properties.recipe = { type: "string", enum: [...RECIPE_IDS, "custom"] };
-  s.properties.spec.required.push("background", "music", "recipe");
+  s.properties.spec.properties.balance = {
+    type: "object",
+    additionalProperties: false,
+    required: ["warmupSec", "lives", "cleanRunSec", "timeLimitSec", "spawnPerSec"],
+    properties: {
+      warmupSec: { type: "number" },
+      lives: { type: "integer" },
+      cleanRunSec: { type: "number" },
+      timeLimitSec: { type: "number" },
+      spawnPerSec: { type: "number" },
+    },
+  };
+  s.properties.spec.required.push("background", "music", "recipe", "balance");
   return s;
 })();

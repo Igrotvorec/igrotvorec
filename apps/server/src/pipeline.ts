@@ -55,7 +55,28 @@ export function kitConfig(spec: GameSpec, assets: SpriteMap): KitConfig {
 export function assembleVersion(spec: GameSpec, assets: SpriteMap, code: string): string {
   if (engineOf(spec) === "kit") return assembleGame(kitConfig(spec, assets), code, spec.language);
   const base = kitConfig(spec, assets);
-  return assemblePhaserGame({ ...base, background: assets.bg ?? null, music: spec.music }, code, spec.language);
+  return assemblePhaserGame({ ...base, background: assets.bg ?? null, music: spec.music, balance: spec.balance }, code, spec.language);
+}
+
+/**
+ * Баланс из спеки в разумных пределах. Лимит времени принудительно 1,3–1,5× чистого прохождения
+ * (плейтест: при 2× и больше таймер ничего не решал), 0 — без таймера.
+ */
+function normalizeBalance(raw: unknown) {
+  const b = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const num = (v: unknown, def: number, min: number, max: number) => {
+    const n = typeof v === "number" && Number.isFinite(v) ? v : def;
+    return Math.min(max, Math.max(min, n));
+  };
+  const cleanRunSec = Math.round(num(b.cleanRunSec, 40, 15, 180));
+  const limit = num(b.timeLimitSec, 0, 0, 300);
+  return {
+    warmupSec: Math.round(num(b.warmupSec, 8, 4, 15)),
+    lives: Math.round(num(b.lives, 3, 1, 9)),
+    cleanRunSec,
+    timeLimitSec: limit === 0 ? 0 : Math.round(Math.min(cleanRunSec * 1.5, Math.max(cleanRunSec * 1.3, limit))),
+    spawnPerSec: Math.round(num(b.spawnPerSec, 1, 0.1, 6) * 100) / 100,
+  };
 }
 
 /** Обрезает безобидные превышения (длинные строки, лишние пункты), чтобы не валить всю генерацию. */
@@ -111,6 +132,7 @@ async function makeSpec(engine: GameEngine, system: string, user: string, signal
     norm.background = typeof norm.background === "string" && norm.background.trim() ? norm.background.slice(0, 400) : "soft gradient sky";
     if (!MUSIC_MOODS.includes(norm.music as (typeof MUSIC_MOODS)[number])) norm.music = "happy";
     norm.recipe = typeof norm.recipe === "string" ? norm.recipe.slice(0, 32) : "custom";
+    norm.balance = normalizeBalance(norm.balance);
   } else {
     delete norm.background;
     delete norm.music;

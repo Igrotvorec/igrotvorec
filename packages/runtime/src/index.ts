@@ -58,6 +58,8 @@ export interface PhaserKitConfig extends KitConfig {
   background: string | null;
   /** Настроение фоновой музыки: happy | calm | tense; пусто — без музыки. */
   music?: string;
+  /** Числа баланса из спеки (GG.balance). */
+  balance?: { warmupSec: number; lives: number; cleanRunSec: number; timeLimitSec: number; spawnPerSec: number };
 }
 
 const PHASER_CSS = `#gg-root{position:fixed;inset:0;z-index:1}#gg-root canvas{display:block}
