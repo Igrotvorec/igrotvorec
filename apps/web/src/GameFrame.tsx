@@ -119,7 +119,7 @@ export function GameFrame({
             title="Игра"
       sandbox="allow-scripts"
       allow="autoplay; vibrate"
-      src={`/g/${versionId}${runtime ? `?r=${runtime}` : ""}#run=${runId}`}
+      src={`/g/${versionId}${runtime ? `?r=${runtime}` : ""}#run=${runId}${thumbToken ? "&thumb=1" : ""}`}
     />
   );
 }

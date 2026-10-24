@@ -10,6 +10,8 @@
   var H = 640;
   var runId = (location.hash.match(/run=([\w-]+)/) || [])[1] || "";
   var hasParent = window.parent && window.parent !== window;
+  /** Снимок для галереи нужен только превью автора: оболочка просит его через #…&thumb=1. */
+  var wantThumb = /[#&]thumb=1/.test(location.hash);
 
   function post(msg) {
     if (!hasParent) return;
@@ -536,7 +538,7 @@
 
   // ---------- снимок для галереи: кадр стартовой сцены без оверлея (он в DOM, а не на канвасе) ----------
   function postThumb() {
-    if (errorShown || !hasParent) return;
+    if (errorShown || !hasParent || !wantThumb) return;
     try {
       var c = document.createElement("canvas");
       c.width = 270;
