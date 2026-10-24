@@ -19,24 +19,11 @@ export interface ChatOpts {
   signal: AbortSignal;
 }
 
-/**
- * service_tier (fast-режим): для GPT из LLM_SERVICE_TIER; для Claude (Opus) только из отдельной
- * CLAUDE_SERVICE_TIER, по умолчанию выключенной: fast у Opus оплачивается отдельно и дорого.
- */
-function tierFor(model: string): { service_tier?: "priority"; max_tokens?: number } {
-  if (model.startsWith("claude")) {
-    // Прокси без max_tokens обрезает ответ Claude на 8192 токенах — код игры на Opus длиннее.
-    const tier = process.env.CLAUDE_SERVICE_TIER;
-    return { max_tokens: 32_000, ...(tier ? { service_tier: tier as "priority" } : {}) };
-  }
-  return config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {};
-}
-
 export async function chatJson<T>(opts: ChatOpts & { schemaName: string; schema: object }): Promise<T> {
   const res = await llm.chat.completions.create(
     {
       model: opts.model,
-      ...tierFor(opts.model),
+      ...(config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {}),
       messages: [
         { role: "system", content: opts.system },
         { role: "user", content: opts.user },
@@ -59,7 +46,7 @@ export async function chatStream(opts: ChatOpts & { onChars: (n: number) => void
     {
       model: opts.model,
       stream: true,
-      ...tierFor(opts.model),
+      ...(config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {}),
       messages: [
         { role: "system", content: opts.system },
         { role: "user", content: opts.user },
