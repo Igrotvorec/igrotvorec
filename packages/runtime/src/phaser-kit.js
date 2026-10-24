@@ -75,7 +75,10 @@
   var storage = {
     get: function (key) {
       return new Promise(function (ok) {
-        if (!hasParent) return ok(null);
+        if (!hasParent) {
+          // Скачанный файл без оболочки: рекорд в localStorage самого файла (в песочнице его нет).
+          try { return ok(localStorage.getItem("gg:" + document.title + ":" + String(key).slice(0, 64))); } catch (e) { return ok(null); }
+        }
         var id = ++reqSeq;
         pending[id] = ok;
         post({ type: "storage:get", reqId: id, key: String(key).slice(0, 64) });
@@ -83,6 +86,7 @@
       });
     },
     set: function (key, value) {
+      if (!hasParent) try { localStorage.setItem("gg:" + document.title + ":" + String(key).slice(0, 64), String(value).slice(0, 2048)); } catch (e) {}
       post({ type: "storage:set", key: String(key).slice(0, 64), value: String(value).slice(0, 2048) });
     },
   };

@@ -85,7 +85,11 @@
   var storage = {
     get: function (key) {
       key = String(key);
-      if (!hasParent) return Promise.resolve(key in memStore ? memStore[key] : null);
+      if (!hasParent) {
+        // Скачанный файл без оболочки: рекорд в localStorage самого файла (в песочнице его нет).
+        try { var v = localStorage.getItem("gg:" + document.title + ":" + key); if (v !== null) return Promise.resolve(v); } catch (e) {}
+        return Promise.resolve(key in memStore ? memStore[key] : null);
+      }
       return new Promise(function (resolve) {
         var id = ++reqSeq;
         pending[id] = resolve;
@@ -102,6 +106,7 @@
       key = String(key);
       value = String(value).slice(0, 2048);
       memStore[key] = value;
+      if (!hasParent) try { localStorage.setItem("gg:" + document.title + ":" + key, value); } catch (e) {}
       post({ type: "storage:set", key: key, value: value });
     },
   };

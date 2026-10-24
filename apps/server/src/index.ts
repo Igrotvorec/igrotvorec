@@ -140,6 +140,26 @@ app.get("/api/games/:id/stats", (c) => {
   return getGame(id) ? c.json(gameStats(id)) : c.json({ error: "not found" }, 404);
 });
 
+/**
+ * HTML версии для офлайн-игры: тот же самодостаточный файл, что /g, плюс CSP в meta — при открытии
+ * с диска нет заголовков сервера, а сеть игре по-прежнему не нужна и запрещена.
+ */
+const OFFLINE_CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
+app.get("/api/versions/:id/download", async (c) => {
+  const id = c.req.param("id");
+  const v = /^[a-f0-9]{10}$/.test(id) ? getVersion(id) : null;
+  const html = v ? await currentHtml(id) : null;
+  if (!v || html === null) return c.notFound();
+  const name = `${v.spec.title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").trim().slice(0, 60) || "игра"} v${v.version}.html`;
+  return c.body(html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n${OFFLINE_CSP}`), 200, {
+    "content-type": "text/html; charset=utf-8",
+    "content-disposition": `attachment; filename="igrotvorec-${id}.html"; filename*=UTF-8''${encodeURIComponent(name)}`,
+    "x-content-type-options": "nosniff",
+    // Скачивание не должно рендериться в нашем origin: только как файл.
+    "content-security-policy": "sandbox",
+  });
+});
+
 app.get("/api/versions/:id/code", (c) => {
   const v = getVersion(c.req.param("id"));
   return v ? c.json({ code: v.code }) : c.json({ error: "not found" }, 404);

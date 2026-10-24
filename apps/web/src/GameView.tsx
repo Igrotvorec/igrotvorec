@@ -6,6 +6,7 @@ import {
   ChartBarIcon as ChartBar,
   CodeIcon as Code,
   CopyIcon as Copy,
+  DownloadSimpleIcon as DownloadSimple,
   CheckIcon as Check,
   PlayIcon as Play,
   PlusIcon as Plus,
@@ -164,6 +165,9 @@ export function GameView({ id }: { id: string }) {
               <a className="icon-btn icon-btn-lg" href={playUrl} target="_blank" rel="noreferrer" aria-label="Открыть игру в новой вкладке" title="Открыть игру в новой вкладке">
                 <ArrowSquareOut size={18} aria-hidden />
               </a>
+              <a className="icon-btn icon-btn-lg" href={`/api/versions/${version.id}/download`} download aria-label="Скачать HTML для игры без интернета" title="Скачать HTML для игры без интернета">
+                <DownloadSimple size={18} aria-hidden />
+              </a>
             </div>
           </div>
           <div className="stage-body" role="tabpanel" id="stage-panel" aria-labelledby={`tab-${tab}`}>
@@ -289,7 +293,7 @@ export function GameView({ id }: { id: string }) {
           </ol>
         </section>
 
-        <Share gameId={game.id} />
+        <Share gameId={game.id} versionId={version.id} />
       </aside>
     </main>
   );
@@ -389,7 +393,7 @@ function StatusLine({ status, repairing }: { status: FrameStatus | null; repairi
   }
 }
 
-function Share({ gameId }: { gameId: string }) {
+function Share({ gameId, versionId }: { gameId: string; versionId: string }) {
   const [url, setUrl] = useState("");
   const [qr, setQr] = useState("");
   const [copied, setCopied] = useState(false);
@@ -435,6 +439,9 @@ function Share({ gameId }: { gameId: string }) {
           </div>
           <a className="link" href={url} target="_blank" rel="noreferrer">
             Открыть в новой вкладке <ArrowSquareOut size={14} aria-hidden />
+          </a>
+          <a className="link" href={`/api/versions/${versionId}/download`} download>
+            Скачать для офлайна <DownloadSimple size={14} aria-hidden />
           </a>
         </div>
       </div>
