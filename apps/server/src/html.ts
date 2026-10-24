@@ -32,6 +32,8 @@ export async function currentHtml(versionId: string): Promise<string | null> {
   if (!(await file.exists())) return null;
   const html = await file.text();
   if (html.includes(RUNTIME_MARK)) return html;
+  // Эксперимент с Phaser: такие игры собираются своим сборщиком, kit-пересборка их сломала бы.
+  if (html.includes('<meta name="gg-engine" content="phaser">')) return html;
   const fresh = rebuildHtml(versionId);
   if (!fresh) return html;
   await writeAtomic(gamePath(versionId), fresh);

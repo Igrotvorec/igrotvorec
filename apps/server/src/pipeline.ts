@@ -30,7 +30,7 @@ export function kitConfig(spec: GameSpec, assets: SpriteMap): KitConfig {
 }
 
 /** Обрезает безобидные превышения (длинные строки, лишние пункты), чтобы не валить всю генерацию. */
-function normalizeSpec(raw: unknown): unknown {
+export function normalizeSpec(raw: unknown, maxSprites = 3): unknown {
   if (!raw || typeof raw !== "object") return raw;
   const r = { ...(raw as Record<string, unknown>) };
   const limits: Record<string, number> = { title: 40, concept: 400, coreMechanic: 400, controls: 200, howToPlay: 120, winCondition: 200, loseCondition: 200 };
@@ -50,7 +50,7 @@ function normalizeSpec(raw: unknown): unknown {
         fallback: [...String(x.fallback ?? "⭐")].slice(0, 2).join("") || "⭐",
       }))
       .filter((x) => x.key && x.description && !seen.has(x.key) && seen.add(x.key))
-      .slice(0, 3);
+      .slice(0, maxSprites);
   } else r.sprites = [];
   r.palette = {
     background: hex(pal.background, "#10131a"),

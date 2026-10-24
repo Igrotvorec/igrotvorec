@@ -71,7 +71,7 @@ export interface CheckResult {
  * не считается. Код не исполняется. Настоящая граница безопасности — sandbox и CSP; эта проверка
  * отсекает очевидные нарушения до публикации.
  */
-export function checkGameCode(code: string): CheckResult {
+export function checkGameCode(code: string, engine: "kit" | "phaser" = "kit"): CheckResult {
   const errors = new Set<string>();
   if (code.length < 200) errors.add("Code is too short to be a game");
   if (code.length > 120_000) errors.add("Code is too large (over 120 KB)");
@@ -124,10 +124,14 @@ export function checkGameCode(code: string): CheckResult {
         if (!prop) return;
         const label = FORBIDDEN_PROPS[prop];
         if (label && m.object.type === "Identifier" && PROP_OWNERS.has(m.object.name)) errors.add(`Forbidden API: ${label}`);
+        // Загрузчик Phaser ходит в сеть (CSP его заблокирует): ассеты уже лежат текстурами.
+        if (engine === "phaser" && prop === "load" && m.object.type === "ThisExpression") errors.add("Do not use this.load: all textures are preloaded by key");
       },
       NewExpression(node) {
         const callee = (node as acorn.NewExpression).callee;
         if (callee.type === "Identifier" && callee.name === "Function") errors.add("Forbidden API: конструктор Function");
+        // Игру Phaser создаёт рантайм; своя Phaser.Game обошла бы экраны и самодиагностику.
+        if (engine === "phaser" && callee.type === "MemberExpression" && callee.property.type === "Identifier" && callee.property.name === "Game") errors.add("Do not create Phaser.Game: the runtime creates it, call GG.run(GameScene)");
       },
       CallExpression(node) {
         const c = node as acorn.CallExpression;
@@ -137,7 +141,13 @@ export function checkGameCode(code: string): CheckResult {
     });
   }
 
-  for (const hook of ["kit.onStart", "kit.onRender"]) if (!code.includes(hook)) errors.add(`Missing ${hook}(...)`);
-  if (!/kit\.(win|lose)\s*\(/.test(code)) errors.add("Game never calls kit.win() or kit.lose(), so a round cannot end");
+  if (engine === "phaser") {
+    if (!/class\s+\w+\s+extends\s+Phaser\.Scene/.test(code)) errors.add("Missing class GameScene extends Phaser.Scene");
+    if (!/GG\.run\s*\(/.test(code)) errors.add("Missing GG.run(GameScene)");
+    if (!/GG\.(win|lose)\s*\(/.test(code)) errors.add("Game never calls GG.win() or GG.lose(), so a round cannot end");
+  } else {
+    for (const hook of ["kit.onStart", "kit.onRender"]) if (!code.includes(hook)) errors.add(`Missing ${hook}(...)`);
+    if (!/kit\.(win|lose)\s*\(/.test(code)) errors.add("Game never calls kit.win() or kit.lose(), so a round cannot end");
+  }
   return { ok: errors.size === 0, errors: [...errors] };
 }
