@@ -9,6 +9,7 @@ import { MAX_THUMB_CHARS } from "@gg/shared";
 import { addEvent, getGame, getVersion, listGames, needsThumb, recoverThumbClaims, saveThumb, thumbPath } from "./db";
 import { thumbTokenValid } from "./thumbs";
 import { currentHtml } from "./html";
+import { clientIp, takeOperation } from "./ratelimit";
 import { bodyLimit } from "hono/body-limit";
 import { RUNTIME_VERSION } from "@gg/runtime";
 import { RefusalError, edit, generate, repair } from "./pipeline";
@@ -59,6 +60,12 @@ function sseOperation(run: (emit: (e: GenEvent) => void, signal: AbortSignal) =>
     streamSSE(c, async (stream) => {
       if (running >= MAX_CONCURRENT) {
         await stream.writeSSE({ data: JSON.stringify({ type: "error", message: "Сервер занят, попробуйте через минуту" }) });
+        return;
+      }
+      const wait = takeOperation(clientIp(c));
+      if (wait > 0) {
+        const minutes = Math.ceil(wait / 60);
+        await stream.writeSSE({ data: JSON.stringify({ type: "error", message: `Лимит генераций на этот час исчерпан. Попробуйте через ${minutes} мин.` }) });
         return;
       }
       running++;
@@ -118,6 +125,8 @@ app.post("/api/repair", async (c) => {
 app.get("/api/games", (c) => c.json(listGames()));
 
 app.get("/api/stats", (c) => c.json({ minSessions: MIN_SESSIONS, segments: segmentStats() }));
+
+app.get("/api/health", (c) => c.json({ ok: true, runtimeVersion: RUNTIME_VERSION }));
 
 app.get("/api/config", (c) => c.json({ publicUrl: config.publicUrl, runtimeVersion: RUNTIME_VERSION }));
 
@@ -222,7 +231,17 @@ app.get("/play/:gameId", (c) => {
   if (!game) return c.text("Игра не найдена", 404);
   const wanted = c.req.query("v");
   const version = (wanted && game.history.find((v) => v.id === wanted || String(v.version) === wanted)) || game.history.at(-1)!;
-  return c.html(playShell({ title: version.spec.title, versionId: version.id, background: version.spec.palette.background }), 200, {
+  const base = config.publicUrl.replace(/\/$/, "");
+  const image = game.thumbVersionId ? `${base}/thumb/${game.thumbVersionId}` : game.hasCover ? `${base}/cover/${game.latestVersionId}` : null;
+  const shell = playShell({
+    title: version.spec.title,
+    versionId: version.id,
+    background: version.spec.palette.background,
+    description: version.spec.howToPlay,
+    url: `${base}/play/${game.id}`,
+    image,
+  });
+  return c.html(shell, 200, {
     "content-security-policy": SHELL_CSP,
     "x-content-type-options": "nosniff",
     "referrer-policy": "no-referrer",

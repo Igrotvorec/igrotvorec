@@ -5,20 +5,35 @@ services:
     env_file: .env
     environment:
       DATA_DIR: /data
+      # Адрес клиента для лимита генераций приходит от Caddy в X-Forwarded-For.
+      TRUST_PROXY: "1"
     volumes:
-      - ./data:/data
+      - ${DATA_PATH:-./data}:/data
+    # Наружу порт не публикуется: доступ только через Caddy.
+    expose:
+      - "8787"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8787/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
   caddy:
     image: caddy:2
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      DOMAIN: ${DOMAIN:?укажите DOMAIN в .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
+      - caddy_config:/config
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 volumes:
   caddy_data:
+  caddy_config:

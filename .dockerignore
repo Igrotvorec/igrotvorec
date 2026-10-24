@@ -2,6 +2,10 @@ node_modules
 **/node_modules
 **/dist
 data
+data-*
 .env
+.env.*
 .git
 tools
+docs
+research

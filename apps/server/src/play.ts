@@ -3,7 +3,8 @@ import { RUNTIME_VERSION } from "@gg/runtime";
  * Доверенная оболочка /play: полноэкранная страница, которая держит игру в sandbox-iframe,
  * владеет хранилищем (у игры с opaque origin нет localStorage) и отправляет телеметрию.
  */
-export function playShell(opts: { title: string; versionId: string; background: string }): string {
+/** og-теги: ссылка на игру в Telegram или VK показывается карточкой с названием, правилами и кадром. */
+export function playShell(opts: { title: string; versionId: string; background: string; description: string; url: string; image: string | null }): string {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
   const data = JSON.stringify({ versionId: opts.versionId, runtime: RUNTIME_VERSION }).replace(/</g, "\\u003c");
   return `<!doctype html>
@@ -13,7 +14,15 @@ export function playShell(opts: { title: string; versionId: string; background: 
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="${esc(opts.background)}">
 <title>${esc(opts.title)}</title>
-<style>html,body{margin:0;height:100%;overflow:hidden;background:${esc(opts.background)};overscroll-behavior:none}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;display:block}</style>
+<meta name="description" content="${esc(opts.description)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Игротворец">
+<meta property="og:title" content="${esc(opts.title)}">
+<meta property="og:description" content="${esc(opts.description)}">
+<meta property="og:url" content="${esc(opts.url)}">
+${opts.image ? `<meta property="og:image" content="${esc(opts.image)}">
+<meta name="twitter:card" content="summary_large_image">
+` : ""}<style>html,body{margin:0;height:100%;overflow:hidden;background:${esc(opts.background)};overscroll-behavior:none}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;display:block}</style>
 </head>
 <body>
 <iframe id="game" sandbox="allow-scripts" allow="autoplay; vibrate" title="${esc(opts.title)}"></iframe>

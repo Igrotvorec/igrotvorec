@@ -1,6 +1,24 @@
-{$SITE_ADDRESS} {
+# Домен берётся из DOMAIN (.env рядом с docker-compose.yml). Caddy сам получит и продлит сертификат.
+{$DOMAIN} {
 	# Эндпоинты генерации стримят SSE; не сжимаем их, чтобы события уходили сразу.
 	@compressible not path /api/*
 	encode @compressible zstd gzip
-	reverse_proxy app:8787
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+		# «?» — только если приложение не задало своё (у /play и /g заголовки строже).
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	}
+
+	reverse_proxy app:8787 {
+		# SSE: отдаём события клиенту без буферизации.
+		flush_interval -1
+	}
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
 }
