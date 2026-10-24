@@ -5,14 +5,17 @@
  * браузером (sandbox + CSP), а оболочка не должна выполнить ни одной чужой команды.
  *
  *   bun --env-file=.env tools/sandbox-escape.ts [baseUrl]
+ *   ENGINE=phaser bun --env-file=.env tools/sandbox-escape.ts [baseUrl]   # то же в сборке Phaser
  */
 import puppeteer from "puppeteer-core";
-import { assembleGame } from "../packages/runtime/src/index";
+import { assembleGame, assemblePhaserGame } from "../packages/runtime/src/index";
 import { addVersion, createGame } from "../apps/server/src/db";
 import type { GameSpec } from "../packages/shared/src/spec";
 import { parseGameMessage } from "../packages/shared/src/protocol";
 
 const BASE = process.argv[2] ?? "http://localhost:8787";
+/** kit — прежний мини-движок, phaser — сборка с Phaser 3 и phaser-kit.js (те же sandbox и CSP). */
+const ENGINE = process.env.ENGINE === "phaser" ? "phaser" : "kit";
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 /** Каждая атака возвращает строку-результат; "BLOCKED: ..." — атака не удалась. */
@@ -80,13 +83,19 @@ const ATTACKS = String.raw`
   parent.postMessage(arr, "*");
   // Самонавигация iframe на внешний сайт (фишинг внутри нашей страницы) — проверяется снаружи.
   setTimeout(function () { location.href = "https://example.com/phish-inside-frame"; }, 6000);
-  kit.onStart(function () {});
-  kit.onRender(function (ctx) { ctx.fillStyle = "#f00"; ctx.fillRect(0, 0, 50, 50); });
-  if (false) kit.win();
+  /*ENGINE_HOOKS*/
 })();
 `;
+const KIT_HOOKS = `kit.onStart(function () {});
+  kit.onRender(function (ctx) { ctx.fillStyle = "#f00"; ctx.fillRect(0, 0, 50, 50); });
+  if (false) kit.win();`;
+const PHASER_HOOKS = `class GameScene extends Phaser.Scene { create() { this.add.rectangle(25, 25, 50, 50, 0xff0000); } }
+  GG.run(GameScene);
+  if (false) GG.win();`;
+const GAME_CODE = ATTACKS.replace("/*ENGINE_HOOKS*/", ENGINE === "phaser" ? PHASER_HOOKS : KIT_HOOKS);
 
 const spec: GameSpec = {
+  ...(ENGINE === "phaser" ? { engine: "phaser" as const } : {}),
   title: "Sandbox test",
   audience: "general",
   genre: "other",
@@ -110,9 +119,12 @@ const v = await addVersion({
   baseVersionId: null,
   kind: "create",
   spec,
-  code: ATTACKS,
+  code: GAME_CODE,
   assets: {},
-  html: assembleGame({ title: spec.title, instructions: spec.howToPlay, palette: spec.palette, uiScale: 1, speed: 1 }, ATTACKS),
+  html:
+    ENGINE === "phaser"
+      ? assemblePhaserGame({ title: spec.title, instructions: spec.howToPlay, palette: spec.palette, uiScale: 1, speed: 1, background: null }, GAME_CODE)
+      : assembleGame({ title: spec.title, instructions: spec.howToPlay, palette: spec.palette, uiScale: 1, speed: 1 }, GAME_CODE),
   instruction: "[sandbox-escape test]",
   model: "handcrafted",
   genMs: 0,
