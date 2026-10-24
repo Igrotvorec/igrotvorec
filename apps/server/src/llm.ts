@@ -19,11 +19,20 @@ export interface ChatOpts {
   signal: AbortSignal;
 }
 
+/**
+ * service_tier (fast-режим) только для моделей GPT. Модели Claude (Opus) всегда идут без fast:
+ * их fast оплачивается отдельно и дорого, поэтому защищаемся в коде, а не только настройкой .env.
+ */
+function tierFor(model: string): { service_tier?: "priority" } {
+  if (!config.serviceTier || model.startsWith("claude")) return {};
+  return { service_tier: config.serviceTier as "priority" };
+}
+
 export async function chatJson<T>(opts: ChatOpts & { schemaName: string; schema: object }): Promise<T> {
   const res = await llm.chat.completions.create(
     {
       model: opts.model,
-      ...(config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {}),
+      ...tierFor(opts.model),
       messages: [
         { role: "system", content: opts.system },
         { role: "user", content: opts.user },
@@ -46,7 +55,7 @@ export async function chatStream(opts: ChatOpts & { onChars: (n: number) => void
     {
       model: opts.model,
       stream: true,
-      ...(config.serviceTier ? { service_tier: config.serviceTier as "priority" } : {}),
+      ...tierFor(opts.model),
       messages: [
         { role: "system", content: opts.system },
         { role: "user", content: opts.user },
