@@ -40,6 +40,10 @@ Fields:
   - timeLimitSec: 0 (no timer) by default — difficulty comes from lives. Use 1.3-1.5 × cleanRunSec only when time pressure IS the game: quiz, hidden objects, racing, or the user asked "на время";
   - spawnPerSec: how many objects or threats appear per second at level 1 (a careless player can keep up at level 1).
   Levels and new threats begin only after the warm-up.
+- mode: how a session continues, so players have a reason to play again:
+  - "levels" (default): endless levels in a row. Each level is a short round with a goal (30-60 s); winning it leads to the next level, which is harder (faster, denser, a new object or rule every level up to ~level 5, then mixing them, a boss every 5th level), and the score keeps growing across levels. Losing ends the run; the record is the best score and the best level.
+  - "endless": no win at all, a pure score chase like Block Blast, Stack, Flappy Bird, endless runners: difficulty grows continuously with time and score, the round ends only when the player fails, the record is the high score.
+  Pick "endless" when the request or recipe is naturally a score chase (block puzzle, stack, flappy, endless runner/jumper), otherwise "levels".
 - hudStyle: any of "chips", "corners", "themed-panel", "icon-meter" (the server may pick another one for variety).
 - recipe: the proven genre recipe closest to the request; its progression, object kinds and power-ups guide the design (keep the user's theme and ideas). "custom" only if none fits at all.
 ${recipeMenu()}
@@ -125,6 +129,11 @@ Phaser 3.90 API that works (prefer these exact forms):
 - timers (never setTimeout/setInterval): this.time.addEvent({ delay: 800, loop: true, callback: () => this.spawn() }); this.time.delayedCall(1500, () => ...).
 - input: this.input.on('pointerdown', (p) => ...), 'pointermove' (p.isDown for drag), 'pointerup'; p.x/p.y are game coordinates. Swipe = compare pointerdown and pointerup positions (> 60px). Draggable: obj.setInteractive({ draggable: true }); this.input.on('drag', (p, obj, x, y) => { obj.x = x; obj.y = y; }). Keyboard is optional extra.
 - depth: setDepth; random: Phaser.Math.Between(a, b), Phaser.Math.FloatBetween, Phaser.Utils.Array.GetRandom(arr); clamp: Phaser.Math.Clamp.
+
+Session structure (players must want to keep playing; one short round and a dead end is a failure):
+- GG.mode === "levels": the runtime runs levels in a row. Read GG.level (1, 2, 3, ...) in create() and build THAT level: the goal count grows a little (e.g. base + 4·(level−1)), speeds and spawn rates grow ~12% per level (on top of GG.speed), a NEW object, enemy or rule appears at levels 2, 3, 4 and 5, every 5th level is a boss or special level, after that keep mixing everything. Call GG.win('…') when the level's goal is reached: the runtime shows "Уровень N пройден", keeps the score and starts level N+1. GG.score is NOT reset between levels; multiply points by the level (e.g. 10 × level per catch) so scores grow big. Show the level in the HUD.
+- GG.mode === "endless": never call GG.win. Difficulty ramps continuously with time and score (faster, denser, new obstacle types every ~20 s or every N points), points grow with combos and multipliers so a good run reaches thousands; the run ends only through GG.lose or lives running out. Show the score big in the HUD and the best (GG.best) small.
+- Inside a level the within-level stages from the rules below still apply (warm-up, threats, final wave), but keep each level short (30-60 s for a good player).
 
 Balance and stakes (most important; a game nobody can lose is a failure):
 - Track the goal in countable objects or events from the spec (caught, hit, reached), show it as "12 / 25" with a progress bar, call GG.setGoal and update the HUD on every change, and call GG.win(...) right after the HUD shows the final count. GG.score is for the record and can include bonuses, but never decides the win.

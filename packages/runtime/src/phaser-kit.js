@@ -236,21 +236,28 @@
     if (kind === "start") {
       card.appendChild(el("h1", "gg-title", cfg.title || "Игра"));
       if (cfg.instructions) card.appendChild(el("p", "gg-text", cfg.instructions));
-      if (best > 0) card.appendChild(el("p", "gg-sub", "Рекорд: " + best));
+      if (best > 0) card.appendChild(el("p", "gg-sub", "Рекорд: " + best + (cfg.mode !== "endless" && bestLevel > 1 ? " · лучший уровень " + bestLevel : "")));
     } else if (kind === "paused") {
       card.appendChild(el("h1", "gg-title", "Пауза"));
-    } else {
-      card.appendChild(el("h1", "gg-title", kind === "won" ? "Победа!" : "Игра окончена"));
+    } else if (kind === "won") {
+      // Уровень пройден: забег продолжается, счёт сохраняется.
+      card.appendChild(el("h1", "gg-title", "Уровень " + level + " пройден!"));
       if (message) card.appendChild(el("p", "gg-text", message));
-      if (goal) {
-        var gl = el("p", "gg-score", (goal.label || "Цель") + ": " + goal.done + " / " + goal.total);
-        if (contrast(cfg.palette.primary, cfg.palette.background) < 3) gl.style.color = cfg.palette.text;
-        card.appendChild(gl);
-      }
-      card.appendChild(el("p", goal ? "gg-sub" : "gg-score", "Счёт: " + score));
-      card.appendChild(el("p", "gg-sub", newRecord ? "Новый рекорд!" : "Рекорд: " + best));
+      var sc1 = el("p", "gg-score", "Счёт: " + score);
+      if (contrast(cfg.palette.primary, cfg.palette.background) < 3) sc1.style.color = cfg.palette.text;
+      card.appendChild(sc1);
+      card.appendChild(el("p", "gg-sub", "Дальше быстрее и сложнее"));
+    } else {
+      card.appendChild(el("h1", "gg-title", "Игра окончена"));
+      if (message) card.appendChild(el("p", "gg-text", message));
+      var big = el("p", "gg-score", cfg.mode === "endless" ? "Счёт: " + score : "Уровень " + level + " · " + score + " очков");
+      if (contrast(cfg.palette.primary, cfg.palette.background) < 3) big.style.color = cfg.palette.text;
+      card.appendChild(big);
+      var rec = newRecord ? "Новый рекорд!" : "Рекорд: " + best;
+      if (cfg.mode !== "endless") rec += newBestLevel ? " · новый лучший уровень" : " · лучший уровень " + bestLevel;
+      card.appendChild(el("p", "gg-sub", rec));
     }
-    var btn = el("button", "gg-btn", kind === "start" ? "Играть" : kind === "paused" ? "Продолжить" : "Ещё раз");
+    var btn = el("button", "gg-btn", kind === "start" ? "Играть" : kind === "paused" ? "Продолжить" : kind === "won" ? "Уровень " + (level + 1) : "Ещё раз");
     btn.style.color = readableOn(cfg.palette.primary);
     var shownAt = Date.now();
     btn.addEventListener("click", function () {
@@ -259,7 +266,7 @@
       ensureAudio();
       SFX.tap();
       if (kind === "paused") resumeGame();
-      else startRound();
+      else startRound(kind === "won");
     });
     card.appendChild(btn);
     overlay.appendChild(card);
@@ -303,10 +310,15 @@
   var softAt = 0;
   var goalMovedAt = 0;
   /** Раунд без таймера не должен длиться вечно: если цель не двигается 30 с после разминки — поражение. */
+  /** Разминка полная только на первом уровне; на следующих — короткая передышка, не больше 3 с. */
+  function warmupMs() {
+    var w = ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000;
+    return level > 1 ? Math.min(w, 3000) : w;
+  }
   var STALL_MSG = "Цель не сдвинулась 30 секунд";
   function stallCheck() {
     if (state !== "playing" || !goal || GG.inWarmup()) return;
-    var warm = ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000 / speedFactor;
+    var warm = warmupMs() / speedFactor;
     if (roundMs() - Math.max(goalMovedAt, warm) > 30000) finish(false, STALL_MSG);
   }
   setInterval(function () { if (!sim) stallCheck(); }, 1000);
@@ -325,11 +337,18 @@
   function gameScene() {
     return game && game.scene.getScene("game");
   }
-  function startRound() {
+  function startRound(next) {
     if (failed || state === "playing") return;
-    score = 0;
+    if (next) level++;
+    else {
+      level = 1;
+      score = 0;
+      runBestBefore = best;
+    }
     activeMs = 0;
-    lives = (cfg.balance && cfg.balance.lives) || 3;
+    // Жизни переходят на следующий уровень, плюс одна в награду (не больше начальных).
+    var maxLives = (cfg.balance && cfg.balance.lives) || 3;
+    lives = next ? Math.min(maxLives, lives + 1) : maxLives;
     forgiven = false;
     softMistakes = 0;
     softAt = 0;
@@ -344,6 +363,14 @@
     startMusic();
   }
   var newRecord = false;
+  /**
+   * Забег: уровни идут подряд, счёт копится. Победа на уровне ведёт на следующий (он сложнее),
+   * поражение заканчивает забег. В режиме endless побед нет — только рекорд.
+   */
+  var level = 1;
+  var bestLevel = 1;
+  var runBestBefore = 0;
+  var newBestLevel = false;
   var simResult = null;
   function finish(won, message) {
     if (state !== "playing") return;
@@ -352,9 +379,15 @@
       state = won ? "won" : "lost";
       return;
     }
-    newRecord = score > best;
+    // «Новый рекорд» объявляется в конце забега; сохраняем рекорд и после каждого уровня.
+    if (!won) newRecord = score > runBestBefore;
     best = Math.max(best, score);
     storage.set("best", String(best));
+    newBestLevel = level > bestLevel;
+    if (newBestLevel) {
+      bestLevel = level;
+      storage.set("bestLevel", String(bestLevel));
+    }
     setState(won ? "won" : "lost");
     stopMusic();
     (won ? SFX.win : SFX.lose)();
@@ -369,7 +402,7 @@
       if (state === "playing") return;
       if (sc) sc.scene.pause();
       showOverlay(won ? "won" : "lost", message);
-    }, 800);
+    }, won ? 500 : 800);
   }
   function pauseGame() {
     if (state !== "playing") return;
@@ -809,6 +842,8 @@
 
   // ---------- автоподбор сложности: раунды ботами на виртуальном времени без отрисовки ----------
   var STEP = 1000 / 60;
+  /** В бесконечном режиме подбор считает «победой» небрежного, если он продержался столько. */
+  var ENDLESS_TARGET_MS = 60000;
   /** Множители скорости, которые пробует подбор (тот же список проверяет сервер). */
   var TUNE_LADDER = [0.6, 0.75, 0.9, 1, 1.15, 1.35, 1.6, 1.9];
   /** «Наугад»: каждые 0,4–1 с касание или протяжка в случайную точку игрового поля. */
@@ -846,6 +881,7 @@
     recentHits = [];
     simResult = null;
     if (botHeld) bot.up();
+    level = 1;
     sc.scene.restart();
     simNow = 0;
     state = "playing";
@@ -877,6 +913,7 @@
         botFlush();
       }
       if (steps % 60 === 0) stallCheck();
+      if (cfg.mode === "endless" && state === "playing" && simNow >= ENDLESS_TARGET_MS) finish(true, "");
       if (warmFrac === null && !GG.inWarmup()) warmFrac = goal ? goal.done / goal.total : 0;
     }
     if (warmFrac === null) warmFrac = goal ? goal.done / goal.total : 0;
@@ -904,7 +941,7 @@
     var baseTime = (cfg.balance && cfg.balance.timeLimitSec) || 0;
     var timeLimit0 = baseTime;
     var calm = calmAudience;
-    var limit = ((cfg.balance && cfg.balance.timeLimitSec) || 0) > 0 ? cfg.balance.timeLimitSec * 1000 + 2000 : 150000;
+    var limit = cfg.mode === "endless" ? ENDLESS_TARGET_MS + 1000 : ((cfg.balance && cfg.balance.timeLimitSec) || 0) > 0 ? cfg.balance.timeLimitSec * 1000 + 2000 : 150000;
     var started = Date.now();
     var BUDGET_MS = 25000;
     var ladder = TUNE_LADDER;
@@ -1105,6 +1142,10 @@
     },
     fx: fx,
     hitbox: hitbox,
+    /** Номер уровня в забеге (с 1). Читайте в create(): цель, скорость и новые объекты растут с ним. */
+    get level() { return level; },
+    /** levels — уровни подряд с GG.win на каждом; endless — без побед, рекорд по счёту. */
+    get mode() { return cfg.mode === "endless" ? "endless" : "levels"; },
     /** Ввод для метода bot(skill): касание, нажатие, перемещение с зажатым пальцем, отпускание (координаты игры). */
     botTap: function (x, y) { botCommand("tap", x, y); },
     botDown: function (x, y) { botCommand("down", x, y); },
@@ -1153,7 +1194,7 @@
       return "hit";
     },
     /** Идёт разминка: ошибки не считаются, опасности не появляются. */
-    inWarmup: function () { return state === "playing" && roundMs() * speedFactor < ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000; },
+    inWarmup: function () { return state === "playing" && roundMs() * speedFactor < warmupMs(); },
     /** Прогресс цели для HUD и финальной карточки: GG.setGoal(12, 24, 'Фрукты'). */
     setGoal: function (done, total, label) {
       var d = Math.max(0, done | 0);
@@ -1227,6 +1268,7 @@
       if (typeof window.Phaser === "undefined") return reportError(new Error("Phaser не загрузился"), "boot");
       if (typeof SceneClass !== "function") return reportError(new Error("game did not call GG.run(GameScene)"), "boot");
       storage.get("best").then(function (v) { best = Math.max(best, parseInt(v || "0", 10) || 0); });
+      storage.get("bestLevel").then(function (v) { bestLevel = Math.max(bestLevel, parseInt(v || "1", 10) || 1); });
       loadImages(function () {
         var frames = 0;
         var Boot = {

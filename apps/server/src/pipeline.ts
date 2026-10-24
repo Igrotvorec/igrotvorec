@@ -3,6 +3,7 @@ import {
   GameSpecSchema,
   HEX_COLOR,
   HUD_STYLES,
+  GAME_MODES,
   MUSIC_MOODS,
   phaserSpecResponseJsonSchema,
   specResponseJsonSchema,
@@ -63,7 +64,7 @@ export function assembleVersion(spec: GameSpec, assets: SpriteMap, code: string)
   const speed = base.speed * (spec.tuning?.factor ?? 1);
   const t = spec.tuning;
   const balance = spec.balance && t && !t.skipped ? { ...spec.balance, lives: t.lives ?? spec.balance.lives, timeLimitSec: t.timeLimitSec ?? spec.balance.timeLimitSec } : spec.balance;
-  return assemblePhaserGame({ ...base, speed, speedFactor: spec.tuning?.factor ?? 1, background: assets.bg ?? null, music: spec.music, balance }, code, spec.language);
+  return assemblePhaserGame({ ...base, speed, mode: spec.mode ?? "levels", speedFactor: spec.tuning?.factor ?? 1, background: assets.bg ?? null, music: spec.music, balance }, code, spec.language);
 }
 
 /**
@@ -140,6 +141,7 @@ async function makeSpec(engine: GameEngine, system: string, user: string, signal
     norm.background = typeof norm.background === "string" && norm.background.trim() ? norm.background.slice(0, 400) : "soft gradient sky";
     if (!MUSIC_MOODS.includes(norm.music as (typeof MUSIC_MOODS)[number])) norm.music = "happy";
     norm.recipe = typeof norm.recipe === "string" ? norm.recipe.slice(0, 32) : "custom";
+    if (!GAME_MODES.includes(norm.mode as (typeof GAME_MODES)[number])) norm.mode = "levels";
     // Стиль HUD выбирается случайно, а не моделью: модель почти всегда брала «панель», и игры выглядели одинаково.
     // При правке стиль сохраняется (EDIT_SPEC_SYSTEM просит оставить поля, а spec приходит из прошлой версии).
     if (!HUD_STYLES.includes(norm.hudStyle as (typeof HUD_STYLES)[number]) || !keepHud) norm.hudStyle = HUD_STYLES[Math.floor(Math.random() * HUD_STYLES.length)];
@@ -149,6 +151,7 @@ async function makeSpec(engine: GameEngine, system: string, user: string, signal
     delete norm.music;
     delete norm.recipe;
     delete norm.hudStyle;
+    delete norm.mode;
   }
   const parsed = GameSpecSchema.safeParse(norm);
   if (!parsed.success) throw new Error(`Spec failed validation: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`);
