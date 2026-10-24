@@ -60,7 +60,9 @@ export function assembleVersion(spec: GameSpec, assets: SpriteMap, code: string)
   const base = kitConfig(spec, assets);
   // Множитель из автоподбора сложности ботами (если превью автора его уже провело).
   const speed = base.speed * (spec.tuning?.factor ?? 1);
-  return assemblePhaserGame({ ...base, speed, background: assets.bg ?? null, music: spec.music, balance: spec.balance }, code, spec.language);
+  const t = spec.tuning;
+  const balance = spec.balance && t && !t.skipped ? { ...spec.balance, lives: t.lives ?? spec.balance.lives, timeLimitSec: t.timeLimitSec ?? spec.balance.timeLimitSec } : spec.balance;
+  return assemblePhaserGame({ ...base, speed, background: assets.bg ?? null, music: spec.music, balance }, code, spec.language);
 }
 
 /**

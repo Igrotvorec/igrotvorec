@@ -27,6 +27,10 @@ export const MAX_STORAGE_VALUE = 2048;
 export interface TuneReport {
   /** Множитель GG.speed, при котором баланс попал в цель. */
   factor: number;
+  /** Жизни после подбора (вторая ручка, когда скорость упёрлась в край). */
+  lives: number;
+  /** Время раунда после подбора (третья ручка; 0 — без таймера). */
+  timeLimitSec: number;
   goodMs: number;
   carelessWins: number;
   carelessMs: number;
@@ -84,8 +88,10 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
       if (factor === null || !TUNE_FACTORS.includes(factor)) return null;
       const report: TuneReport = {
         factor,
+        lives: Math.round(n(r.lives, 9) ?? 3) || 3,
+        timeLimitSec: Math.round(n(r.timeLimitSec, 600) ?? 0),
         goodMs: n(r.goodMs, 600_000) ?? 0,
-        carelessWins: n(r.carelessWins, 3) ?? 0,
+        carelessWins: n(r.carelessWins, 8) ?? 0,
         carelessMs: n(r.carelessMs, 600_000) ?? 0,
         randomWon: r.randomWon === true,
         tried: n(r.tried, 10) ?? 0,

@@ -802,6 +802,10 @@
     var sc = gameScene();
     if (!sc || typeof sc.bot !== "function" || typeof game.headlessStep !== "function") return null;
     var base = cfg.speed;
+    var baseLives = (cfg.balance && cfg.balance.lives) || 3;
+    var lives0 = baseLives;
+    var baseTime = (cfg.balance && cfg.balance.timeLimitSec) || 0;
+    var timeLimit0 = baseTime;
     var calm = calmAudience;
     var limit = ((cfg.balance && cfg.balance.timeLimitSec) || 0) > 0 ? cfg.balance.timeLimitSec * 1000 + 2000 : 150000;
     var started = Date.now();
@@ -813,40 +817,73 @@
     game.loop.sleep();
     sim = true;
     try {
-      for (var attempt = 0; attempt < 5; attempt++) {
+      for (var attempt = 0; attempt < 10; attempt++) {
         var f = ladder[idx];
         cfg.speed = base * f;
-        var good = simRound(1, limit);
-        var careless = [simRound(0.5, limit), simRound(0.5, limit), simRound(0.5, limit)];
-        var random = simRound("random", limit);
-        if (!good || !careless[0] || !careless[1] || !careless[2] || !random) return null;
-        var cWins = careless.filter(function (c) { return c.won; }).length;
-        var r = { idx: idx, factor: f, goodWon: good.won, goodMs: Math.round(good.ms), carelessWins: cWins, carelessMs: Math.round((careless[0].ms + careless[1].ms + careless[2].ms) / 3), randomWon: random.won };
-        // Цель: хороший выигрывает, наугад проигрывает; небрежный 1-2 из 3 (дети и пожилые: 2-3 из 3).
-        r.tooHard = !good.won || cWins < (calm ? 2 : 1);
-        r.tooEasy = random.won || (!calm && cWins === 3);
-        tried[idx] = r;
+        if (cfg.balance) cfg.balance.lives = lives0;
+        if (cfg.balance && timeLimit0) cfg.balance.timeLimitSec = timeLimit0;
+        var lim = timeLimit0 ? timeLimit0 * 1000 + 2000 : limit;
+        // Раунды дешёвые (без отрисовки), поэтому выборка большая: разброс случайности меньше.
+        var goods = [simRound(1, lim), simRound(1, lim)];
+        var careless = [];
+        for (var c = 0; c < 8; c++) careless.push(simRound(0.5, lim));
+        var randoms = [simRound("random", lim), simRound("random", lim), simRound("random", lim)];
+        var all = goods.concat(careless, randoms);
+        for (var a = 0; a < all.length; a++) if (!all[a]) return null;
+        var gWins = goods.filter(function (g) { return g.won; }).length;
+        var cWins = careless.filter(function (g) { return g.won; }).length;
+        var cTimeouts = careless.filter(function (g) { return !g.won && timeLimit0 && g.ms >= timeLimit0 * 1000 - 500; }).length;
+        var rWins = randoms.filter(function (g) { return g.won; }).length;
+        var r = { idx: idx, factor: f, lives: lives0, timeLimitSec: timeLimit0, goodWon: gWins > 0, goodMs: Math.round(goods[0].ms), carelessWins: cWins, carelessMs: Math.round(careless.reduce(function (s, g) { return s + g.ms; }, 0) / careless.length), randomWon: rWins > 0 };
+        // Цель: хороший выигрывает, наугад нет; небрежный выигрывает 3-5 из 8 (дети и пожилые 5-8 из 8).
+        r.tooHard = gWins === 0 || cWins < (calm ? 5 : 3);
+        r.tooEasy = rWins > 0 || (!calm && cWins > 5);
+        // Небрежный проигрывает по таймеру, а не по ошибкам — помогает только больше времени.
+        r.timerBound = r.tooHard && timeLimit0 && cTimeouts >= (8 - cWins) / 2;
+        tried[idx + ":" + lives0 + ":" + timeLimit0] = r;
         if (!r.tooHard && !r.tooEasy) {
           chosen = r;
           break;
         }
         var next = r.tooHard ? idx - 1 : idx + 1;
-        if (next < 0 || next >= ladder.length || tried[next] || Date.now() - started > BUDGET_MS) break;
+        if (Date.now() - started > BUDGET_MS) break;
+        // Третья ручка — время раунда, когда небрежный не успевает (не больше чем вдвое).
+        if (r.timerBound && timeLimit0 < baseTime * 2) {
+          timeLimit0 = Math.min(baseTime * 2, Math.round(timeLimit0 * 1.25));
+          continue;
+        }
+        // Скорость упёрлась в край лестницы: вторая ручка — жизни (больше, если слишком сложно).
+        if (next < 0 && cfg.balance && lives0 < 9) {
+          lives0 = Math.min(9, lives0 + 2);
+          continue;
+        }
+        if (next >= ladder.length && cfg.balance && lives0 > 2) {
+          lives0 = Math.max(2, lives0 - 1);
+          continue;
+        }
+        if (next < 0 || next >= ladder.length || tried[next]) break;
         idx = next;
       }
       if (!chosen) {
-        // Точно в цель не попали: ближайший по направлению вариант, где хороший игрок ещё выигрывает.
+        // Точно в цель не попали. Если есть не слишком сложные варианты — самый сложный из них;
+        // если всё слишком сложно — самый лёгкий, где хороший игрок ещё выигрывает.
         var list = Object.keys(tried).map(function (k) { return tried[k]; }).filter(function (t) { return t.goodWon; });
-        list.sort(function (a, b) { return (a.tooEasy ? 1 : 0) - (b.tooEasy ? 1 : 0) || b.factor - a.factor; });
-        chosen = list[0] || null;
+        var easier = list.filter(function (t) { return !t.tooHard; });
+        if (easier.length) easier.sort(function (a, b) { return b.factor - a.factor || a.lives - b.lives; });
+        else list.sort(function (a, b) { return a.factor - b.factor || b.lives - a.lives; });
+        chosen = (easier.length ? easier : list)[0] || null;
       }
-      return chosen ? { factor: chosen.factor, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
+      return chosen ? { factor: chosen.factor, lives: chosen.lives, timeLimitSec: chosen.timeLimitSec, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
     } catch (e) {
       reportError(e, "tune");
       return null;
     } finally {
       sim = false;
       cfg.speed = base;
+      if (cfg.balance) {
+        cfg.balance.lives = baseLives;
+        cfg.balance.timeLimitSec = baseTime;
+      }
       state = "start";
       score = 0;
       goal = null;

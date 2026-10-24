@@ -56,6 +56,8 @@ export const GameSpecSchema = z.object({
   tuning: z
     .object({
       factor: z.number(),
+      lives: z.number().optional(),
+      timeLimitSec: z.number().optional(),
       goodMs: z.number().optional(),
       carelessWins: z.number().optional(),
       carelessMs: z.number().optional(),
