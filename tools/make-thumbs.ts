@@ -3,13 +3,28 @@
  * снимок для обложки и автоподбор сложности ботами. Открывает каждую игру в Chrome с того же origin,
  * получает кадр и отчёт подбора от рантайма и отправляет их с токеном автора (нужен тот же DATA_DIR).
  *
- *   DATA_DIR=./data-demo bun --env-file=.env tools/make-thumbs.ts [baseUrl]
+ *   DATA_DIR=./data-demo bun --env-file=.env tools/make-thumbs.ts [baseUrl] [--retune]
+ *
+ * --retune: сбросить прошлую калибровку игр галереи и пересобрать их HTML без неё (иначе новый подбор
+ * считал бы от уже ускоренной или замедленной игры), затем откалибровать заново.
  */
 import puppeteer from "puppeteer-core";
 import { db } from "../apps/server/src/db";
 import { thumbToken } from "../apps/server/src/thumbs";
+import { gamePath } from "../apps/server/src/db";
+import { rebuildHtml, writeAtomic } from "../apps/server/src/html";
 
-const BASE = process.argv[2] ?? "http://localhost:8787";
+const BASE = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "http://localhost:8787";
+if (process.argv.includes("--retune")) {
+  const listed = db
+    .query(`SELECT v.id FROM versions v JOIN games g ON g.id = v.game_id WHERE g.listed = 1 AND json_extract(v.spec, '$.tuning') IS NOT NULL`)
+    .all() as { id: string }[];
+  for (const { id } of listed) {
+    db.query("UPDATE versions SET spec = json_remove(spec, '$.tuning') WHERE id = ?").run(id);
+    await writeAtomic(gamePath(id), rebuildHtml(id)!);
+  }
+  console.log(`сброшено калибровок: ${listed.length}`);
+}
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const rows = db
   .query(

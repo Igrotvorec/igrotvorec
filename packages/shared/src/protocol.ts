@@ -99,7 +99,7 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
         lives: Math.round(n(r.lives, 9) ?? 3) || 3,
         timeLimitSec: Math.round(n(r.timeLimitSec, 600) ?? 0),
         goodMs: n(r.goodMs, 600_000) ?? 0,
-        carelessWins: n(r.carelessWins, 8) ?? 0,
+        carelessWins: n(r.carelessWins, 16) ?? 0,
         carelessMs: n(r.carelessMs, 600_000) ?? 0,
         randomWon: r.randomWon === true,
         tried: n(r.tried, 10) ?? 0,

@@ -70,10 +70,10 @@ class GameScene extends Phaser.Scene {
 }
 GG.run(GameScene);
 
-The bot(skill, dt) method (required): before the first round the runtime plays the game many times on virtual time with this bot to calibrate difficulty (it scales GG.speed so a careless player wins about half the rounds). It is called every frame (dt ms) while a test round runs.
-- Play like a human through REAL input only: GG.botTap(x, y), GG.botDown(x, y), GG.botMove(x, y) (pointer held, for drags and swipes), GG.botUp() (releases where the pointer is; for a swipe: botDown at the start, botMove to the end, then botUp). Never change game state directly from bot().
-- skill 1 = a good player: picks the best target, reacts within ~180 ms, aims precisely. skill 0.5 = a careless player: reacts after ~450 ms, aims with ±70 px error, ignores about a third of the opportunities, sometimes moves the wrong way. Interpolate for other values.
-- Keep its own timers on this (e.g. this._botWait), initialized in create(). Read your own objects (positions, velocities) to decide. Short and simple: ~20-40 lines.
+The bot(skill, dt) method (required): before the first round the runtime plays the game many times on virtual time with this bot to calibrate difficulty (it scales GG.speed and lives so a careless player wins about half the rounds). It is called every frame (dt ms) while a test round runs.
+- Write a GOOD player only (ignore skill): pick the best target or the safest move every frame and act on it. The runtime itself turns it into a careless player by delaying, scattering and dropping its commands — do not add randomness, delays or skipped opportunities yourself.
+- Play through REAL input only: GG.botTap(x, y), GG.botDown(x, y), GG.botMove(x, y) (pointer held, for drags and swipes), GG.botUp() (releases where the pointer is; for a swipe: botDown at the start, botMove to the end, then botUp). Never change game state directly from bot().
+- Keep its own state on this (e.g. this._botHeld), initialized in create(). Read your own objects (positions, velocities) to decide; lead moving targets by their velocity. Short and simple: ~20-40 lines.
 - GG.simulating is true during these rounds; do not show anything special for them.
 Canvas: ${720}x${1280} logical pixels, portrait (GG.W, GG.H). Origin top-left. Arcade physics is on with zero gravity (set this.physics.world.gravity.y or body.setGravityY for platformers/jumps).
 
@@ -155,6 +155,7 @@ Make it feel like a hit Flash game (all required):
 - HUD drawn by you in the top band y 0-200 only (goal progress, lives as hearts from GG.lives, timer, level), readable, with stroke, fully opaque, setDepth(100) so effects never cover it, setScrollFactor(0) if the camera moves; keep the top-right 100x100 corner free (mute button there). Spawn gameplay objects below y 220 or from beyond the screen edge, never under the HUD.
 
 Hard rules:
+- Removing objects inside a loop: iterate over a copy (group.getChildren().slice() or [...array]).
 - Initialize ALL round state inside create() (properties on this), never in the constructor or at top level: the scene restarts every round. Do not reset GG.score yourself (the runtime does).
 - No this.load, no URLs, no new Phaser.Game, no DOM (document, createElement), no window.*, no network, no localStorage (use GG.storage), no eval, no setTimeout/setInterval, no alert.
 - No start screen, pause button, or game-over screen of your own: the runtime shows them. Just call GG.win/GG.lose.

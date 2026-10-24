@@ -375,14 +375,14 @@ function TuningLine({ tuning, pending }: { tuning: GameVersion["spec"]["tuning"]
   if (tuning.skipped) return null;
   if (tuning.failed)
     return (
-      <span className="status warn" title={`Ускорение и жизни не дали нужного баланса: небрежный бот выигрывает ${tuning.carelessWins ?? 0} из 8${tuning.warmupLeak ? ", цель набирается ещё в разминке" : ""}.`}>
+      <span className="status warn" title={`Ускорение и жизни не дали нужного баланса: небрежный бот выигрывает ${tuning.carelessWins ?? 0} из 16${tuning.warmupLeak ? ", цель набирается ещё в разминке" : ""}.`}>
         <span>Баланс не подобран</span>
       </span>
     );
-  const detail = `Хороший бот проходит за ${Math.round((tuning.goodMs ?? 0) / 1000)} с, небрежный выигрывает ${tuning.carelessWins ?? 0} из 8, игра наугад ${tuning.randomWon ? "иногда выигрывает" : "не выигрывает"}. Скорость ×${tuning.factor}, жизней ${tuning.lives ?? "—"}.`;
+  const detail = `Хороший бот проходит за ${Math.round((tuning.goodMs ?? 0) / 1000)} с, небрежный выигрывает ${tuning.carelessWins ?? 0} из 16, игра наугад ${tuning.randomWon ? "иногда выигрывает" : "не выигрывает"}. Скорость ×${tuning.factor}, жизней ${tuning.lives ?? "—"}.`;
   return (
     <span className="status ok" title={detail}>
-      <span>Сложность подобрана: небрежный {tuning.carelessWins ?? 0}/8</span>
+      <span>Сложность подобрана: небрежный {tuning.carelessWins ?? 0}/16</span>
     </span>
   );
 }

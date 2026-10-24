@@ -749,6 +749,38 @@
     move: function (x, y) { botEvent("mousemove", x, y); },
     up: function (x, y) { botEvent("mouseup", x == null ? botX : x, y == null ? botY : y); botHeld = false; },
   };
+  /**
+   * Навык бота задаёт рантайм, одинаково для всех игр: модель пишет только хорошего игрока, а
+   * небрежного рантайм делает сам — команды исполняются с задержкой реакции, с промахом по координатам
+   * и пропадают во время отвлечений. Раньше «небрежного» писала модель, и в каждой игре он был своим.
+   */
+  var botSkill = 1;
+  var botQueue = [];
+  var botNoise = { x: 0, y: 0 };
+  var distractedUntil = 0, nextDistraction = 0;
+  function botReaction() { return 120 + 300 * (1 - botSkill); }
+  function botCommand(type, x, y) {
+    if (!sim) return bot[type](x, y);
+    if (simNow < distractedUntil) return;
+    // Новый жест (нажатие или касание) — новый промах; перемещения жеста сдвинуты на тот же промах.
+    if (type === "tap" || type === "down") {
+      var spread = 130 * (1 - botSkill);
+      botNoise = { x: (Math.random() * 2 - 1) * spread, y: (Math.random() * 2 - 1) * spread * 0.5 };
+    }
+    botQueue.push({ t: simNow + botReaction(), type: type, x: x == null ? null : x + botNoise.x, y: y == null ? null : y + botNoise.y });
+  }
+  function botFlush() {
+    if (botSkill < 1 && simNow >= nextDistraction) {
+      distractedUntil = simNow + 700 + Math.random() * 600;
+      nextDistraction = distractedUntil + 4000 + Math.random() * 5000;
+    }
+    while (botQueue.length && botQueue[0].t <= simNow) {
+      var c = botQueue.shift();
+      var cx = c.x == null ? null : Math.max(4, Math.min(W - 4, c.x));
+      var cy = c.y == null ? null : Math.max(4, Math.min(H - 4, c.y));
+      bot[c.type](cx, cy);
+    }
+  }
 
   // ---------- автоподбор сложности: раунды ботами на виртуальном времени без отрисовки ----------
   var STEP = 1000 / 60;
@@ -794,6 +826,10 @@
     state = "playing";
     playStartedAt = simNow;
     var act = kind === "random" ? randomBot() : null;
+    botSkill = typeof kind === "number" ? kind : 1;
+    botQueue = [];
+    distractedUntil = 0;
+    nextDistraction = 3000 + Math.random() * 4000;
     var steps = 0;
     var warmFrac = null;
     while (state === "playing" && simNow < maxMs) {
@@ -805,11 +841,12 @@
       if (kind === "random") act();
       else if (typeof kind === "number" && live && typeof live.bot === "function") {
         try {
-          live.bot(kind, STEP);
+          live.bot(1, STEP);
         } catch (e) {
           reportError(e, "bot");
           return null;
         }
+        botFlush();
       }
       if (steps % 60 === 0) stallCheck();
       if (warmFrac === null && !GG.inWarmup()) warmFrac = goal ? goal.done / goal.total : 0;
@@ -856,7 +893,7 @@
         // Раунды дешёвые (без отрисовки), поэтому выборка большая: разброс случайности меньше.
         var goods = [simRound(1, lim), simRound(1, lim)];
         var careless = [];
-        for (var c = 0; c < 8; c++) careless.push(simRound(0.5, lim));
+        for (var c = 0; c < 16; c++) careless.push(simRound(0.5, lim));
         var randoms = [simRound("random", lim), simRound("random", lim), simRound("random", lim)];
         var idle = simRound("idle", lim);
         var all = goods.concat(careless, randoms, [idle]);
@@ -867,14 +904,15 @@
         var rWins = randoms.filter(function (g) { return g.won; }).length;
         var r = { idx: idx, factor: f, lives: lives0, timeLimitSec: timeLimit0, goodWon: gWins > 0, goodMs: Math.round(goods[0].ms), carelessWins: cWins, carelessMs: Math.round(careless.reduce(function (s, g) { return s + g.ms; }, 0) / careless.length), randomWon: rWins > 0 };
         // Цель: хороший выигрывает, наугад нет; небрежный выигрывает 3-5 из 8 (дети и пожилые 5-8 из 8).
-        r.tooHard = gWins === 0 || cWins < (calm ? 5 : 3);
+        r.tooHard = gWins === 0 || cWins < (calm ? 10 : 6);
         r.idleWon = !!idle.won;
-        r.tooEasy = rWins > 0 || idle.won || (!calm && cWins > 5);
+        r.tooEasy = rWins > 0 || idle.won || (!calm && cWins > 10);
         // Цель собирается в разминке: ускорение тут не помогает, нужна правка самой игры.
         r.warmupLeak = goods.some(function (g) { return g.warmFrac > 0.3; });
         // Небрежный проигрывает по таймеру, а не по ошибкам — помогает только больше времени.
-        r.timerBound = r.tooHard && timeLimit0 && cTimeouts >= (8 - cWins) / 2;
+        r.timerBound = r.tooHard && timeLimit0 && cTimeouts >= (16 - cWins) / 2;
         tried[idx + ":" + lives0 + ":" + timeLimit0] = r;
+        if (/[#&]tunedebug=1/.test(location.hash)) console.log("TUNEDBG " + JSON.stringify(r));
         if (!r.tooHard && !r.tooEasy) {
           chosen = r;
           break;
@@ -967,10 +1005,10 @@
     fx: fx,
     hitbox: hitbox,
     /** Ввод для метода bot(skill): касание, нажатие, перемещение с зажатым пальцем, отпускание (координаты игры). */
-    botTap: function (x, y) { bot.tap(x, y); },
-    botDown: function (x, y) { bot.down(x, y); },
-    botMove: function (x, y) { bot.move(x, y); },
-    botUp: function (x, y) { bot.up(x, y); },
+    botTap: function (x, y) { botCommand("tap", x, y); },
+    botDown: function (x, y) { botCommand("down", x, y); },
+    botMove: function (x, y) { botCommand("move", x, y); },
+    botUp: function (x, y) { botCommand("up", x, y); },
     /** Идёт автоподбор сложности (время виртуальное, экрана не видно). */
     get simulating() { return sim; },
     /** Нижняя граница HUD (y): игровые объекты появляются и поражаются только ниже. */
@@ -1040,6 +1078,12 @@
     hasImage: function (key) { return !!images[key]; },
     run: function (Scene) { SceneClass = Scene; },
   };
+
+  // Модель часто удаляет объекты прямо в group.getChildren().forEach(...): живой массив сдвигается
+  // при каждом destroy, и каждый второй объект пропускается (враги «переживали» появление босса).
+  if (window.Phaser && window.Phaser.GameObjects && window.Phaser.GameObjects.Group) {
+    window.Phaser.GameObjects.Group.prototype.getChildren = function () { return this.children.entries.slice(); };
+  }
 
   // Загрузчик отдельно от API: код игры получает API как `var GG = __GG.init(cfg)`.
   window.__GG = {
