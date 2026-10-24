@@ -397,3 +397,5 @@ body:has(.workspace) .topbar-inner { max-width: none; padding: 0 20px; }
 .build-fail summary { cursor: pointer; width: max-content; }
 .build-fail code { display: block; margin-top: 8px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--bg-subtle); border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; font-size: 12.5px; }
 .build-fail .build-foot { margin-top: 0; }
+
+.stage-statuses { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 100%; }

@@ -186,7 +186,10 @@ export function GameView({ id }: { id: string }) {
                     onTuned={() => load(false)}
                   />
                 </Phone>
-                <StatusLine status={status?.versionId === version.id ? status : null} repairing={repairing} />
+                <div className="stage-statuses">
+                  <StatusLine status={status?.versionId === version.id ? status : null} repairing={repairing} />
+                  <TuningLine tuning={version.spec.tuning} pending={version.spec.engine === "phaser" && !version.spec.tuning && !!thumbTokenFor(version.id)} />
+                </div>
               </div>
             )}
             {tab === "code" && <CodeView version={version} />}
@@ -358,6 +361,23 @@ function VersionRow({ v, current, latest, onSelect }: { v: GameVersion; current:
         {latest && <span className="tag tag-accent">Последняя</span>}
       </button>
     </li>
+  );
+}
+
+/** Итог автоподбора сложности ботами: сколько раз из 8 выигрывает небрежный игрок. */
+function TuningLine({ tuning, pending }: { tuning: GameVersion["spec"]["tuning"]; pending: boolean }) {
+  if (!tuning)
+    return pending ? (
+      <span className="status">
+        <span>Подбираю сложность</span>
+      </span>
+    ) : null;
+  if (tuning.skipped) return null;
+  const detail = `Хороший бот проходит за ${Math.round((tuning.goodMs ?? 0) / 1000)} с, небрежный выигрывает ${tuning.carelessWins ?? 0} из 8, игра наугад ${tuning.randomWon ? "иногда выигрывает" : "не выигрывает"}. Скорость ×${tuning.factor}, жизней ${tuning.lives ?? "—"}.`;
+  return (
+    <span className="status ok" title={detail}>
+      <span>Сложность подобрана: небрежный {tuning.carelessWins ?? 0}/8</span>
+    </span>
   );
 }
 
