@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RECIPE_IDS } from "./recipes";
 
 export const AUDIENCES = ["kids", "teens", "adults", "seniors", "general"] as const;
 export type Audience = (typeof AUDIENCES)[number];
@@ -49,6 +50,8 @@ export const GameSpecSchema = z.object({
   background: z.string().max(400).optional(),
   /** Настроение фоновой музыки (Phaser). */
   music: z.enum(MUSIC_MOODS).optional(),
+  /** Рецепт жанра из research/genre-recipes.json или "custom" (Phaser). */
+  recipe: z.string().max(32).optional(),
 });
 export type GameSpec = z.infer<typeof GameSpecSchema>;
 export type GameEngine = NonNullable<GameSpec["engine"]>;
@@ -124,6 +127,7 @@ export const phaserSpecResponseJsonSchema = (() => {
   };
   s.properties.spec.properties.background = { type: "string" };
   s.properties.spec.properties.music = { type: "string", enum: [...MUSIC_MOODS] };
-  s.properties.spec.required.push("background", "music");
+  s.properties.spec.properties.recipe = { type: "string", enum: [...RECIPE_IDS, "custom"] };
+  s.properties.spec.required.push("background", "music", "recipe");
   return s;
 })();

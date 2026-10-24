@@ -2,7 +2,7 @@
  * Промпты для игр на Phaser 3: спека «как у хитов Flash» с прогрессией и ставками, код одной сцены
  * поверх рантайма phaser-kit.js (GG API, GG.fx), правка и автоисправление.
  */
-import { AUDIENCE_PROFILES, patternsFor, type GameSpec } from "@gg/shared";
+import { AUDIENCE_PROFILES, patternsFor, recipeForPrompt, recipeMenu, type GameSpec } from "@gg/shared";
 import { SPEC_SECURITY, quoteUserText } from "./prompts";
 
 /** Общий стиль иллюстраций: спрайты и фон должны выглядеть как одна игра. */
@@ -33,6 +33,8 @@ Fields:
 - sprites: 3-6 key objects that deserve illustrated art: the player, enemies/obstacles of each kind, the collectible, the power-up, the projectile if any. Not UI, not background, not tiny particles. key: short lowercase id; description: vivid visual description in English for an illustrator (object only, consistent art style, no background; projectiles: "vertical, pointing up"; enemy projectiles bright and glowing, clearly different from the player's); fallback: one similar emoji.
 - background: ONE full-screen portrait background scene in English for an illustrator that matches the theme (e.g. "sunny cartoon farm field with a wooden fence and distant hills"). No characters, no text, no UI; keep the middle area simple so gameplay objects stay readable.
 - music: mood of the background loop: happy (bright, kids/casual), calm (seniors, puzzles), tense (action, shooters).
+- recipe: the proven genre recipe closest to the request; its progression, object kinds and power-ups guide the design (keep the user's theme and ideas). "custom" only if none fits at all.
+${recipeMenu()}
 - No real-money mechanics, no gore, no violence for kids, no copyrighted characters by name.
 
 Output: {"allowed": boolean, "refusalReason": string, "spec": {...}}.
@@ -136,6 +138,9 @@ Audience profile "${p.label}" (sizes in 720px canvas units):
 - Avoid: ${p.avoid.join("; ")}.
 - Notes: ${p.notes.join("; ")}.
 ${patterns.length ? `\nPatterns from successful super-app mini-games (optional):\n${patterns.map((x) => `- ${x.hint}`).join("\n")}\n` : ""}${obs}
+${recipeForPrompt(spec.recipe, spec.audience)}
+Where the recipe and the hard rules above disagree, the rules win (goal in objects, levels by goal progress, GG.fx for effects).
+
 Write the complete scene now.`;
 }
 

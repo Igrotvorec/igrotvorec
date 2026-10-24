@@ -1,0 +1,730 @@
+{
+  "version": 1,
+  "checked": "2026-10-24",
+  "conventions": {
+    "units": "W = GG.W, H = GG.H (canvas 720x1280 in phaser-kit; 2x the 360x640 logical grid). Speeds in H/s or W/s, sizes as fractions of W, times in seconds. Multiply every speed by GG.speed (audience profile). Min tap target in canvas px = profile.minTapTargetPx * GG.W / 360.",
+    "tags": "[S:key] = number or rule taken from the source with that key in genre-recipes-sources.md; [H] = our own estimate (heuristic), tune with play data.",
+    "difficultyCurve": "d(t) = 1 + sqrt(t / 167), t = seconds since round start: 1.42 at 30 s, 1.6 at 60 s, 2.04 at 180 s. Multiply spawn rate and speeds by d(t), divide spawn intervals by d(t) [S:cho]. Add a sawtooth: after each wave/banner, the next wave starts about 20% easier than the previous peak, then climbs again [S:missile].",
+    "universal": [
+      "Visible + audible reaction to every input within 100 ms (Swink: 50 ms feels instant, >100 ms noticeable, 200 ms sluggish) [S:swink]",
+      "Juice level medium-to-high, never none and never extreme: both extremes lowered play time and enjoyment (N=3018) [S:kao]. Juice does not improve player performance, so gameplay must be readable without it [S:hicks]",
+      "Hitstop 20-60 ms on hits and kills only (GG.fx.hit already pauses physics 60 ms); Nijman ~20 ms, Celeste 50 ms on dash [S:nijman][S:celeste]",
+      "Screen shake only for damage, explosions and big combos, never continuous; it caused nausea in Nuclear Throne playtests. Use GG.fx.shake('light'|'medium'|'heavy'); calm audiences get half amplitude automatically [S:nijman][S:eiserloh]",
+      "Flashes: at most 3 per second (WCAG 2.3.1); GG.fx.flash is limited to one per 3 s",
+      "Haptics optional and short: GG.vibrate(15) for a tap (Android keyclick 10-20 ms), at most 3 strengths, gaps >= 50 ms; iOS Safari has no navigator.vibrate, so it is never the only feedback [S:haptics]",
+      "Player hitbox smaller than its sprite (Canabalt: 12x14 inside 24x24, about 50-60%), pickups larger than they look, hazards smaller than they look [S:canabalt][S:igarashi][S:fruitninja]",
+      "Every hazard is telegraphed before it can hurt: spawn above or outside the screen, or show a warning for at least 0.5 s [H][S:stout]",
+      "Random spawns from a shuffled bag (Tetris 7-bag) instead of pure Math.random, so there are no long droughts or streaks [S:tetris]",
+      "Never spawn a hazard on or right next to the player; always leave a reachable path [S:spelunky]",
+      "Phaser Arcade has no continuous collision: keep each body's move per frame under half the smallest obstacle size, or the body tunnels through [S:phaser]",
+      "Onboarding: the player learns by doing; at most 8 words on screen at once; first 5-10 s with no way to fail [S:pvz][H]",
+      "Some failure helps: players who lost some lives but still finished rated the game highest (Juul, n=85) [S:juul]"
+    ],
+    "llmPitfallsAll": [
+      "State not reset on restart: the runtime calls scene.restart() during self-check and on every replay; initialise all fields in create()/init(), clear arrays and timers, never at top level [S:phaser][S:opengame]",
+      "Game never ends or freezes: no reachable GG.win/GG.lose, timers that stop, a win condition counted on objects that never spawn [S:opengame]",
+      "Mode collapse: the model writes the familiar version (classic Pong, Flappy) instead of the requested twist; keep the user's mustHave mechanic [S:factorsim]",
+      "Collision logic wrong or in the wrong order: reset/respawn runs before the collision check, overlap used where collider is needed, sprite and body sizes differ (use setSize/setCircle) [S:factorsim][S:phaser]",
+      "Puzzle and UI games fail rules silently (match detection, pair checks): they scored lowest on intent alignment (52.6 vs 76.8 for platformers) [S:opengame]",
+      "Frame-rate dependent movement: use delta (seconds = delta/1000) or Arcade velocities, never a fixed px-per-update [S:phaser]",
+      "Pooled objects keep physics bodies alive: disableBody(true, true) when recycling, enableBody on reuse [S:phaser]",
+      "Empty or static screen in the first seconds: something must move or invite a tap from frame one [H][S:opengame]"
+    ]
+  },
+  "genres": [
+    {
+      "id": "catcher",
+      "genre": "arcade",
+      "name_ru": "Ловля падающих предметов",
+      "coreLoop": "Items fall from the top; move the basket to catch good ones and dodge bad ones.",
+      "controls": "Drag anywhere: basket follows the finger's x (relative drag, not teleport). Alternative for seniors/kids: tap left or right half to step one lane of 5.",
+      "progression": [
+        "Spawn interval 0.9 s / d(t) (about 0.44 s at 180 s) [S:cho][H]",
+        "Fall speed 0.28 H/s * d(t); at start an item takes about 3.5 s to fall, well above human reaction delay 0.29 s [S:flappy][H]",
+        "Bad items: none for the first 10 s, then about 1 in 6 (Fruit Ninja bomb ratio), up to 1 in 4 after 60 s [S:fruitninja][H]",
+        "Wave = 20 s; banner 'Уровень N' on each wave; next wave starts 20% slower than the previous peak (sawtooth) [S:missile][H]",
+        "Max 4 items on screen at once for kids and seniors, 7 for others [H]"
+      ],
+      "objectKinds": [
+        "good item: +1 point, catch zone 1.2x its sprite [S:igarashi]",
+        "rare golden item (1 in 15): +5 points, falls 20% faster [H]",
+        "bad item: lose a life or -3 points, hitbox 70% of sprite [S:fruitninja]",
+        "power-up capsule (1 in 25) [H]"
+      ],
+      "powerUps": [
+        "Magnet: good items within 0.25 W fly into the basket, 7 s [S:fruitninja][H]",
+        "Wide basket: basket width x1.6, 8 s [S:arkanoid]",
+        "Slow time: fall speed x0.5, 6 s [S:arkanoid]"
+      ],
+      "juice": [
+        "Catch: GG.fx.squash(basket) + GG.fx.float(x, y, '+1') + GG.sfx('coin')",
+        "Combo of 5 catches without a miss: GG.fx.burst at basket in accent color + rising pitch of the coin sound",
+        "Items pop in with GG.fx.pop and rotate slowly while falling",
+        "Missed good item: grey splat stays on the ground for 2 s (permanence) [S:nijman]",
+        "Bad item caught: GG.fx.shake('medium') + red tint flash on basket 150 ms + GG.sfx('hit')",
+        "Basket leans in the direction of movement (angle = velocity x 0.02, clamp 12 degrees) [S:juicy-breakout][H]",
+        "Wave change: GG.fx.banner('Уровень 2!')",
+        "Short GG.vibrate(15) on catch for adults/teens"
+      ],
+      "failStates": ["3 lives lost (misses of good items or bad items caught)", "timer ends below target"],
+      "winCondition": "Catch the target number (e.g. 30 in 60 s) or survive the round timer.",
+      "audienceTweaks": {
+        "kids": "No bad items, or only very distinct ones (a grey stone vs bright fruit); misses do not cost lives; spawn interval at least 1.2 s.",
+        "teens": "Bad items from second 5, golden items worth chasing, best-score combo counter on screen.",
+        "adults": "Default curve; 60 s round.",
+        "seniors": "Fall speed x0.6, max 3 items on screen, lane-tap control, no time pressure on the final score, 5 lives."
+      },
+      "commonPitfalls": [
+        "Basket teleports to the touch point instead of following a relative drag (finger hides the basket) [H]",
+        "Two items spawn in one column at once so one is uncatchable [H]",
+        "Items spawn below the HUD band or already overlapping the basket [S:spelunky]",
+        "Speed grows without a cap until the game is impossible at 60 s [S:cho]"
+      ],
+      "references": ["Fruit Ninja (Halfbrick) for good/bad ratio", "Kaboom! (Activision, 1981)", "Egg catch games (Электроника «Ну, погоди!»)"]
+    },
+    {
+      "id": "jumper",
+      "genre": "arcade",
+      "name_ru": "Прыгун вверх",
+      "coreLoop": "The hero bounces automatically on platforms; steer left/right to climb as high as possible.",
+      "controls": "Hold left or right half of the screen to move, or drag horizontally. Bounce is automatic. The screen wraps horizontally.",
+      "progression": [
+        "Jump parametrised by apex height and time: h = 0.25 H, t_apex = 0.42 s, so v0 = 2h/t = 1.19 H/s and gravity = 2h/t^2 = 2.83 H/s^2 [S:pittman][H]",
+        "Vertical gap between platforms 0.09 H at start, growing with height, capped at 0.17 H (about 2/3 of the jump height) so every gap stays reachable [S:canabalt][H]",
+        "Moving platforms appear after 15% of the target height, speed 0.25 W/s rising to 0.5 W/s; breaking platforms after 35% [S:doodle][H]",
+        "Balance rule: each new obstacle type arrives together with a new power-up (Lima Sky) [S:doodle]",
+        "Horizontal speed 1.1 W/s; air time 0.84 s gives about 0.9 W of reach [H]"
+      ],
+      "objectKinds": [
+        "normal platform",
+        "moving platform (slides horizontally)",
+        "breaking platform: crumbles on touch, no bounce",
+        "enemy or hole (from 50% height): touch = fall, telegraphed by a wobble"
+      ],
+      "powerUps": [
+        "Spring on a platform: bounce x2 height (Doodle Jump spring ~352 points of height) [S:doodle]",
+        "Propeller / jetpack: fly up 2.5 s with no collisions, then a normal fall [S:doodle][H]",
+        "Shield bubble: survives one enemy touch [H]"
+      ],
+      "juice": [
+        "Landing: GG.fx.squash(hero) and a small dust burst (GG.fx.burst, count 6) under the feet",
+        "Hero stretches vertically while rising, squashes at the bottom of the fall (scaleY 1.15/0.85) [S:juicy-breakout]",
+        "Breaking platform splits into two halves that fall and rotate",
+        "Camera follows upwards with lerp k = 0.1 per frame, never down [S:eiserloh]",
+        "Height milestone every 1000 points: GG.fx.banner + GG.sfx('levelup')",
+        "Spring: GG.sfx('jump') with higher pitch, platform spring compresses then pops",
+        "Falling off the bottom: hero spins and shrinks, GG.fx.shake('light')"
+      ],
+      "failStates": ["Fall below the bottom of the screen", "touch an enemy without a shield"],
+      "winCondition": "Reach a target height (e.g. 3000) within the round, or best height when the timer ends.",
+      "audienceTweaks": {
+        "kids": "No enemies, wide platforms (0.3 W), gap capped at 0.12 H; falling once respawns on the lowest visible platform instead of game over.",
+        "teens": "Enemies from 30% height, moving platforms faster, leaderboard-style best height marker line.",
+        "adults": "Default.",
+        "seniors": "Tap-and-hold halves only (no drag), gravity x0.7, gaps capped at 0.1 H, no breaking platforms."
+      },
+      "commonPitfalls": [
+        "Platforms collide from below and block the jump; they must be one-way (collide only while falling: body.velocity.y > 0) [H]",
+        "Generated gaps larger than the jump height, so the run becomes impossible [S:canabalt]",
+        "Camera scrolls down too, or platforms are never recycled and memory grows [S:phaser]",
+        "Bounce triggered every frame while overlapping, launching the hero into space [S:factorsim]"
+      ],
+      "references": ["Doodle Jump (Lima Sky, 2009)", "Icy Tower (Free Lunch Design, 2001)", "Mega Jump (Get Set Games)"]
+    },
+    {
+      "id": "vertical-shooter",
+      "genre": "arcade",
+      "name_ru": "Вертикальный шутер",
+      "coreLoop": "Ship at the bottom fires automatically; drag to dodge and aim at waves descending from above.",
+      "controls": "Drag anywhere: ship moves by the finger delta (relative), stays in the bottom 40%. Fire is automatic.",
+      "progression": [
+        "Player fire every 0.14 s, bullet speed 1.6 H/s, bullets big and bright (Nijman: bigger bullets, high fire rate) [S:nijman][H]",
+        "Wave n has 5 + 2n enemies; wave ends when cleared or after 15 s [H]",
+        "Enemy fire interval 2.5 s per enemy, falling to 1.2 s; Space Invaders shortens fire delay as score rises (48 to 7 frames) [S:invaders][H]",
+        "Formation speeds up as fewer enemies remain (Space Invaders moves one invader per frame) [S:invaders]",
+        "Enemy bullets at most 0.45 H/s and at least 0.02 W in radius, with contrasting color [H]",
+        "Every 4th wave is a big wave; the next wave drops back about 20% (sawtooth like Missile Command 12, 15, 18, 12...) [S:missile]"
+      ],
+      "objectKinds": [
+        "grunt: 1 hit, flies in a formation",
+        "diver: dives toward the player's x after a 0.5 s glow telegraph",
+        "tank: 5 hits, flashes white on each hit",
+        "enemy bullet"
+      ],
+      "powerUps": [
+        "Triple shot: 3-way spread, 8 s (Nijman's 'triple machine gun') [S:nijman][H]",
+        "Shield: absorbs 1 hit, visible bubble [H]",
+        "Bomb: clears all enemy bullets and damages everything on screen, single use [S:missile]"
+      ],
+      "juice": [
+        "Muzzle flash: first frame of each bullet is a bright circle [S:nijman]",
+        "Enemy hit: white flash 1 frame + knockback a few px up [S:nijman]",
+        "Enemy kill: GG.fx.hit(enemy) (60 ms hitstop + burst) + GG.sfx('explode'); about a third leave a bigger explosion [S:nijman]",
+        "Wreck debris stays on screen 1.5 s (permanence) [S:nijman]",
+        "Player hit: GG.fx.shake('heavy') + ship blinks 1.5 s of invulnerability",
+        "Camera kicks 2-4 px opposite to the firing direction on each volley [S:nijman][H]",
+        "Score popups GG.fx.float on kills, bigger for tanks",
+        "Wave cleared: GG.fx.banner('Волна 3') + GG.sfx('levelup')"
+      ],
+      "failStates": ["Lives (3) lost to bullets or collisions", "an enemy reaches the bottom line"],
+      "winCondition": "Clear the final wave (e.g. wave 6) or survive the round timer; boss optional.",
+      "audienceTweaks": {
+        "kids": "Enemies never shoot, they only drift down slowly; hits shrink rather than kill the ship; cartoon 'pop' instead of explosions.",
+        "teens": "Faster waves (start at wave 2), more divers, combo multiplier for kills within 1 s.",
+        "adults": "Default.",
+        "seniors": "Enemy bullets x0.5 speed and big, 5 lives, invulnerability 2.5 s after a hit, no divers."
+      },
+      "commonPitfalls": [
+        "Player hitbox equals the sprite, so near misses feel unfair; use about 40-50% [S:canabalt]",
+        "Bullets never destroyed off-screen (leak and slowdown); recycle through a group pool [S:phaser]",
+        "Fast bullets tunnel through small enemies; keep speed per frame under half the enemy size [S:phaser]",
+        "Finger hides the ship: ship should sit above the touch point or move by relative delta [H]"
+      ],
+      "references": ["Space Invaders (Taito, 1978)", "Galaga (Namco, 1981)", "Sky Force (Infinite Dreams)"]
+    },
+    {
+      "id": "shooting-gallery",
+      "genre": "arcade",
+      "name_ru": "Тир",
+      "coreLoop": "Targets pop up and move for a short time; tap them before they hide, avoid the forbidden ones.",
+      "controls": "Tap a target. No aiming drag needed. Tap target size follows the audience profile.",
+      "progression": [
+        "Round of 10 targets; pass needs 6 hits, later rounds 7, 8, 9 (Duck Hunt: 6/10 in rounds 1-10, then 7, 8, 9, 10) [S:duckhunt]",
+        "Target lifetime 2.2 s, x0.85 each round, floor 0.8 s [H]",
+        "At most 3 targets visible at once; next one appears 0.4-0.9 s after the previous [H]",
+        "Points rise with round number (Duck Hunt 500 to 800 to 1000 per duck) [S:duckhunt]",
+        "Forbidden targets (e.g. a friend, a bomb) from round 2, about 1 in 6 [S:fruitninja][H]"
+      ],
+      "objectKinds": [
+        "basic target: 1 tap",
+        "fast flyer: crosses the screen in 1.5 s, double points",
+        "armoured target: 2 taps, cracks after the first",
+        "forbidden target: tapping it costs a life"
+      ],
+      "powerUps": [
+        "Freeze: all targets stop and the round timer pauses, 7 s (Fruit Ninja Freeze ~7 s) [S:fruitninja]",
+        "Double points: 7 s [S:fruitninja]",
+        "Frenzy: targets spawn 3x faster, 7 s [S:fruitninja]"
+      ],
+      "juice": [
+        "Hit: GG.fx.hit(target) (hitstop + spin-off) + GG.sfx('pop')",
+        "Missed tap: small dust puff at the tap point and a dull click",
+        "Targets pop up with GG.fx.pop and wobble before hiding (0.3 s warning)",
+        "Streak of 3 hits: floating 'x2' combo text, rising pitch",
+        "Bullet holes stay on the background (permanence) [S:nijman]",
+        "Forbidden target hit: GG.fx.shake('medium') + red vignette 200 ms",
+        "Round summary: hits counted one by one with GG.sfx('coin')"
+      ],
+      "failStates": ["Fewer hits than required in a round", "3 forbidden targets hit"],
+      "winCondition": "Pass all rounds (e.g. 4 rounds x 10 targets in about 80 s).",
+      "audienceTweaks": {
+        "kids": "Lifetime at least 2.5 s, no forbidden targets, every tap near a target counts (hit zone 1.5x).",
+        "teens": "Fast flyers from round 1, accuracy bonus, floor 0.6 s.",
+        "adults": "Default.",
+        "seniors": "Only 1-2 targets at once, lifetime at least 3 s, targets never move while visible, pass mark 5/10."
+      },
+      "commonPitfalls": [
+        "Targets smaller than the profile's minimum tap target [H]",
+        "Hit test on the sprite's transparent box corners or only on its exact pixels (pixelPerfect is expensive); use a circle hitArea at least the tap target size [S:phaser]",
+        "Targets overlap the HUD or each other, so one tap counts twice [H]",
+        "Using 'click' events instead of pointerdown on mobile [S:phaser]"
+      ],
+      "references": ["Duck Hunt (Nintendo, 1984)", "Whac-A-Mole (Bob's Space Racers)", "Point Blank (Namco, 1994)"]
+    },
+    {
+      "id": "lane-runner",
+      "genre": "runner",
+      "name_ru": "Раннер по полосам",
+      "coreLoop": "The hero runs forward automatically in one of 3 lanes; switch lanes and jump to dodge obstacles and grab coins.",
+      "controls": "Swipe left/right to change lane, swipe up to jump. Tap-alternative: tap left/right third to change lane, tap middle to jump.",
+      "progression": [
+        "3 lanes (genre convention, no primary source) [H]",
+        "World speed 0.55 H/s * d(t), capped at 1.1 H/s [S:cho][H]",
+        "Distance between obstacle rows at least speed x 0.9 s (reaction 0.29 s + lane change 0.15 s, doubled for safety) [S:flappy][H]",
+        "Each obstacle row blocks at most 2 of 3 lanes, and the free lane must be reachable from the previous free lane [S:spelunky]",
+        "Coin trails every 2-3 rows guide the safe line [H]",
+        "Special set-piece every 20 s (Canabalt: special events every 3-8 buildings) [S:canabalt][H]"
+      ],
+      "objectKinds": [
+        "low barrier: jump over",
+        "wall block: change lane",
+        "coin: +1, collect zone 1.3x sprite [S:igarashi]",
+        "power-up box"
+      ],
+      "powerUps": [
+        "Magnet: pulls coins from all lanes, 8 s [H]",
+        "Shield: survive one crash [H]",
+        "Double coins: 7 s [S:fruitninja]"
+      ],
+      "juice": [
+        "Lane change: hero tilts 10 degrees and stretches sideways 80 ms",
+        "Jump: GG.fx.squash on take-off and landing + dust burst",
+        "Coin: GG.sfx('coin'), pitch rises for every coin in a trail",
+        "Speed lines on the sides when speed passes 0.8 H/s",
+        "Near miss (obstacle passes within 0.05 W): small '+5 близко!' float [H]",
+        "Crash: GG.fx.shake('heavy') + hero tumbles + 300 ms slow-motion (Nijman drops to 10 fps at the climax) [S:nijman]",
+        "Milestone every 500 m: GG.fx.banner"
+      ],
+      "failStates": ["Crash into an obstacle without a shield"],
+      "winCondition": "Reach the target distance (e.g. 2000 m) or the timer ends with the most coins.",
+      "audienceTweaks": {
+        "kids": "Speed x0.7, no jump obstacles (lane change only), crash costs coins instead of ending the run.",
+        "teens": "Faster cap (1.3 H/s), near-miss bonus, combo coins.",
+        "adults": "Default.",
+        "seniors": "Tap thirds instead of swipes, speed capped at 0.6 H/s, rows at least speed x 1.5 s apart, 3 lives."
+      },
+      "commonPitfalls": [
+        "All 3 lanes blocked in one row: an impossible pattern [S:spelunky]",
+        "Lane switch instant teleport with no animation, so the player cannot see what happened [H]",
+        "Swipe recognised as a tap (or vice versa); use a minimum distance of about 0.06 W for swipes [H]",
+        "Obstacles spawned visible at the top already inside the danger zone [S:stout]"
+      ],
+      "references": ["Subway Surfers (Kiloo/SYBO, 2012)", "Temple Run (Imangi, 2011)", "Canabalt (Adam Saltsman, 2009)"]
+    },
+    {
+      "id": "breakout",
+      "genre": "arcade",
+      "name_ru": "Арканоид",
+      "coreLoop": "Bounce the ball off the paddle to break all bricks; don't let it fall.",
+      "controls": "Drag horizontally anywhere: paddle follows the finger's x (relative). Tap to launch the ball.",
+      "progression": [
+        "Ball speeds up after 4 hits, after 12 hits, and on first contact with the two top rows (Atari Breakout rules); each step +12% [S:breakout][H]",
+        "Base ball speed 0.55 H/s, cap 1.0 H/s; at 60 fps that is 21 px per frame at H = 1280, so bricks must be at least 44 px tall to avoid tunneling [S:phaser][H]",
+        "7 columns x 5-6 rows of bricks in portrait (original had 14 per row on landscape) [S:breakout][H]",
+        "Top rows worth more (Breakout: 1/3/5/7 points by row pair) [S:breakout]",
+        "Bounce angle depends on where the ball hits the paddle: centre straight up, edges up to 60 degrees [H]",
+        "Capsule drops after a random 4-8 broken bricks, only one capsule at a time (Arkanoid) [S:arkanoid][H]"
+      ],
+      "objectKinds": [
+        "normal brick: 1 hit",
+        "silver brick: 2 hits, cracks after first [S:arkanoid]",
+        "gold brick: indestructible, use sparingly [S:arkanoid]",
+        "capsule: falls slowly, catch with the paddle"
+      ],
+      "powerUps": [
+        "Expand: paddle x1.6 until the next capsule or ball loss [S:arkanoid]",
+        "Multi-ball (Disruption): ball splits into 3; no capsules while more than one ball is in play [S:arkanoid]",
+        "Slow: ball speed back to base; it speeds up again with hits [S:arkanoid]"
+      ],
+      "juice": [
+        "Bricks fly in at start: from y -500, random rotation +-45 degrees, scale 0.2, 0.7 s with bounce easing, random delay [S:juicy-breakout]",
+        "Paddle stretch: scaleX = 1 + |dx|/100, scaleY = 1.5 - scaleX*0.5 while moving [S:juicy-breakout]",
+        "Ball stretches along velocity (scaleX up to +0.3, scaleY down to -0.2) and flashes white on each hit [S:juicy-breakout]",
+        "Brick hit: jelly scale to 1.2 in 0.05 s, back with elastic in 0.6 s; destroyed bricks fall with gravity, spin and darken [S:juicy-breakout]",
+        "Particles: 5 on wall/brick hits, 20 confetti on paddle hits [S:juicy-breakout]",
+        "Ball trail of about 30 segments [S:juicy-breakout]",
+        "Small spring shake on brick hits, GG.fx.shake('heavy') on ball loss [S:juicy-breakout]",
+        "Separate sounds for wall, brick and paddle; brick pitch rises in a combo [S:juicy-breakout]"
+      ],
+      "failStates": ["All balls lost (3 balls, like the original) [S:breakout]"],
+      "winCondition": "Break all breakable bricks within the round.",
+      "audienceTweaks": {
+        "kids": "Ball speed x0.7 with no speed-ups, paddle 1.5x wider, a bouncy floor saves the ball 3 times.",
+        "teens": "All speed-ups, silver bricks, paddle shrinks to half after the ball first hits the top wall (Breakout rule) [S:breakout].",
+        "adults": "Default, no paddle shrink.",
+        "seniors": "Ball speed cap 0.6 H/s, paddle 0.4 W wide, ball launches only on tap, 5 balls."
+      },
+      "commonPitfalls": [
+        "Ball stuck in a perfectly horizontal or vertical loop; enforce a minimum vertical speed and nudge the angle [H]",
+        "Ball tunnels through bricks or the paddle at high speed [S:phaser]",
+        "Ball gets pushed into the paddle and jitters; reflect only when moving downward [S:factorsim]",
+        "Win check counts gold (indestructible) bricks, so the level can never end [S:opengame]"
+      ],
+      "references": ["Breakout (Atari, 1976)", "Arkanoid (Taito, 1986)", "Juicy Breakout demo (Jonasson & Purho, 2012)"]
+    },
+    {
+      "id": "stack",
+      "genre": "arcade",
+      "name_ru": "Башня из блоков",
+      "coreLoop": "A block slides back and forth above the tower; tap to drop it. The overhang is cut off, so the tower narrows unless you are precise.",
+      "controls": "Single tap anywhere to drop.",
+      "progression": [
+        "Block slides at 0.55 W/s, +4% per floor, cap 1.5 W/s [H]",
+        "Perfect drop if offset <= 4% of block width: block snaps exactly, no cut [H]",
+        "After 8 perfect drops in a row the block grows back by 10% (reported, not verified for Ketchapp's Stack) [S:stack][H]",
+        "Camera rises one floor per drop; every 10 floors the background hue shifts [H]",
+        "Slide direction alternates between left and right entries [H]"
+      ],
+      "objectKinds": ["sliding block", "placed tower blocks", "cut-off piece (falls and rotates away)"],
+      "powerUps": [
+        "Wide block: next 3 blocks spawn 1.3x wider [H]",
+        "Slow slide: speed x0.5 for 3 blocks [H]"
+      ],
+      "juice": [
+        "Drop: GG.fx.squash(tower top) + GG.sfx('tap') with pitch rising per floor",
+        "Cut piece falls with gravity and spins, then fades [S:juicy-breakout]",
+        "Perfect drop: white outline ring expanding from the block + GG.fx.float('Идеально!') + rising chime",
+        "Perfect streak: ring gets bigger each time, at 8 a short GG.fx.flash",
+        "Camera eases up with lerp k = 0.1 [S:eiserloh]",
+        "Game over: camera zooms out to show the whole tower"
+      ],
+      "failStates": ["Block misses the tower completely"],
+      "winCondition": "Reach a target floor (e.g. 25) within the round.",
+      "audienceTweaks": {
+        "kids": "Speed cap 0.8 W/s, perfect tolerance 8%, a miss only removes 2 floors.",
+        "teens": "Speed growth +6% per floor, perfect streak counter, best-height line.",
+        "adults": "Default.",
+        "seniors": "Speed fixed at 0.4 W/s, perfect tolerance 8%, target 15 floors."
+      },
+      "commonPitfalls": [
+        "Cut calculation uses sprite x instead of the block's left/right edges, so widths drift [S:factorsim]",
+        "Block keeps sliding after game over or tap registers twice (no input lock while dropping) [H]",
+        "Speed grows so fast that floor 15 is unplayable [S:cho]"
+      ],
+      "references": ["Stack (Ketchapp, 2016)", "Tower Bloxx (Digital Chocolate, 2005)"]
+    },
+    {
+      "id": "catapult",
+      "genre": "puzzle",
+      "name_ru": "Катапульта",
+      "coreLoop": "Pull back the sling, aim and release to knock down targets with a limited number of shots.",
+      "controls": "Drag back from the sling and release. Power grows with drag distance (cap 0.25 H); the shot goes the opposite way.",
+      "progression": [
+        "3-5 shots per level ('a handful of birds', chosen before building the structure) [S:angrybirds]",
+        "3-6 targets per level in simple box structures (Arcade physics: no rotation stacking; boxes fall and get knocked aside) [S:phaser][H]",
+        "Projectile gravity 1.6 H/s^2 [H]",
+        "Trajectory dots for the first 40% of the path while aiming; the last shot's path stays faintly visible [S:angrybirds][H]",
+        "Stars: 1 = all targets down, 2 = with 1 shot left, 3 = with 2 left; thresholds tuned by playtests (Rovio spent more time on ratings than on building) [S:angrybirds]",
+        "In a 120 s round: 3 small levels of growing distance and cover [H]"
+      ],
+      "objectKinds": ["projectile", "target (falls on any decent hit)", "wooden box (pushed)", "stone block (immovable)"],
+      "powerUps": [
+        "Split shot: projectile splits into 3 on tap in mid-air [S:angrybirds]",
+        "Heavy shot: pushes boxes twice as far [H]"
+      ],
+      "juice": [
+        "Sling band stretches with the drag and snaps back with an elastic tween",
+        "Launch: GG.sfx('jump') + projectile squashes then stretches along velocity [S:juicy-breakout]",
+        "Impact: GG.fx.hit on the target + GG.fx.shake by impact speed (light/medium)",
+        "Boxes flash white on hit and wobble",
+        "Score popups float from each fallen target",
+        "Level clear: stars appear one by one with GG.fx.pop + GG.sfx('coin')"
+      ],
+      "failStates": ["Shots run out with targets still standing"],
+      "winCondition": "Knock down all targets in each level before shots run out.",
+      "audienceTweaks": {
+        "kids": "Long trajectory preview (80%), targets close and big, unlimited shots with stars for fewer.",
+        "teens": "Shorter preview (20%), moving targets in level 3.",
+        "adults": "Default.",
+        "seniors": "Drag anywhere (not only from the sling), long preview, 6 shots, no time pressure."
+      },
+      "commonPitfalls": [
+        "Expecting realistic tower collapse from Arcade physics; it only has rectangles/circles with no rotation physics [S:phaser]",
+        "Projectile never stops, so the turn never ends; end the shot after 4 s or when speed < threshold [S:opengame]",
+        "Release outside the canvas never fires pointerup; also handle pointerupoutside [S:phaser]",
+        "Targets placed out of reach of the max-power arc [H]"
+      ],
+      "references": ["Angry Birds (Rovio, 2009)", "Crush the Castle (Armor Games, 2009)"]
+    },
+    {
+      "id": "tower-defense-lite",
+      "genre": "other",
+      "name_ru": "Защита башни (лайт)",
+      "coreLoop": "Enemies walk along a fixed path; tap empty slots to build towers that shoot them before they reach the base.",
+      "controls": "Tap an empty slot to build (if enough coins); tap a tower to upgrade it. No drag.",
+      "progression": [
+        "Waves grow like Plants vs. Zombies 1-1: 1, 1, 1, 2, 2, 2, 3, 3, 3, then a flagged huge wave of 9 [S:pvz]",
+        "For a 150 s round: 6 waves of 3, 4, 5, 6, 8 and a final big wave of 12, 8 s between waves [H]",
+        "Enemy speed +2% per wave (Bloons late game uses +0.02 per round) [S:bloons]",
+        "Enemy HP x1.15 per wave [H]",
+        "Start coins for exactly 2 towers; each kill gives coins so a third tower is affordable by wave 2 [H]",
+        "One new mechanic at a time: 2nd tower type unlocks at wave 3 (PvZ spreads mechanics out) [S:pvz]"
+      ],
+      "objectKinds": ["walker enemy", "fast runner (x1.6 speed, half HP) from wave 3", "tank (x4 HP) in the final wave", "tower slot / tower"],
+      "powerUps": [
+        "Freeze all enemies: 4 s, one per round [H]",
+        "Coin rain: +50 coins, from a rare enemy drop [H]"
+      ],
+      "juice": [
+        "Tower built: GG.fx.pop + dust burst + GG.sfx('pop')",
+        "Towers rotate to face their target; recoil 3 px on each shot [S:nijman]",
+        "Enemy hit: white flash; kill: GG.fx.burst + coin flies to the coin counter",
+        "Coin counter pulses when it increases",
+        "Huge wave warning: GG.fx.banner('Большая волна!') 3 s before it starts [S:pvz]",
+        "Enemy reaching base: GG.fx.shake('medium') + base hearts shake"
+      ],
+      "failStates": ["Base lives (10) reach zero"],
+      "winCondition": "Survive the final wave.",
+      "audienceTweaks": {
+        "kids": "4 waves only, enemies are cute and 'run away' instead of dying, towers are free.",
+        "teens": "Faster waves (5 s gaps), tower upgrades, bonus for no leaks.",
+        "adults": "Default.",
+        "seniors": "Wave starts only when the player taps 'Дальше', slower enemies (x0.6), slots large."
+      },
+      "commonPitfalls": [
+        "Path and slots overlap, or slots are smaller than the tap target [H]",
+        "Towers target dead or recycled enemies (stale references after pooling) [S:phaser]",
+        "Economy broken: cannot afford a single tower, or money so plentiful no choice matters [H]",
+        "Final wave never spawns because the wave counter is off by one, so the game never ends [S:opengame]"
+      ],
+      "references": ["Plants vs. Zombies (PopCap, 2009)", "Bloons Tower Defense (Ninja Kiwi, 2007)", "Kingdom Rush (Ironhide, 2011)"]
+    },
+    {
+      "id": "snake",
+      "genre": "arcade",
+      "name_ru": "Змейка",
+      "coreLoop": "Steer the snake on a grid to eat food; it grows with every bite; don't hit yourself.",
+      "controls": "Swipe in a direction to turn. Alternative: on-screen 4-arrow pad at the bottom with buttons at least the profile's tap target.",
+      "progression": [
+        "Grid about 12 columns x 18 rows in portrait (Google Snake standard map 15x17) [S:snake][H]",
+        "Move tick 0.18 s at start, -0.005 s per food, floor 0.09 s (Nokia levels differ only by the wait between moves) [S:snake][H]",
+        "+1 segment per food (the +1 rule is a convention; not verified in a primary source) [H]",
+        "Bonus food every 5th piece, disappears after 5 s [H]",
+        "Obstacle blocks appear after 10 food, never on the snake's next 3 cells [S:spelunky][H]"
+      ],
+      "objectKinds": ["snake head and body", "food", "bonus food (timed)", "wall/obstacle"],
+      "powerUps": [
+        "Slow-mo: tick x1.5 longer for 6 s [H]",
+        "Ghost: pass through own body for 5 s [H]"
+      ],
+      "juice": [
+        "Eat: head squashes, GG.fx.burst at food, GG.sfx('coin') with pitch rising per food",
+        "A bulge travels from head to tail after each meal",
+        "Food pops in with GG.fx.pop and pulses gently",
+        "Body segments smoothly interpolate between cells instead of jumping",
+        "Death: segments scatter outward one by one, GG.fx.shake('medium')",
+        "Length milestone (every 10): GG.fx.banner"
+      ],
+      "failStates": ["Head hits own body", "head hits a wall (if walls are on)"],
+      "winCondition": "Reach a target length (e.g. 20) within the round.",
+      "audienceTweaks": {
+        "kids": "Borderless (wraps around), tick 0.25 s fixed, self-collision only shrinks the tail.",
+        "teens": "Walls on, faster floor 0.07 s, bonus food chase.",
+        "adults": "Default.",
+        "seniors": "Wraps around, tick 0.3 s fixed, arrow buttons instead of swipes, target length 12."
+      },
+      "commonPitfalls": [
+        "Two quick swipes in one tick reverse the snake into itself; queue turns (max 2) and reject 180-degree turns [H]",
+        "Food spawns on the snake's body [H]",
+        "Movement tied to frames instead of a fixed tick, so speed depends on the device [S:phaser]",
+        "Instant death when touching a wall the same tick as turning; give one tick of grace (Nokia Snake allowed a few ms before a crash) [S:snake]"
+      ],
+      "references": ["Snake (Nokia 6110, 1998)", "Blockade (Gremlin, 1976)", "Google Snake"]
+    },
+    {
+      "id": "match3",
+      "genre": "match3",
+      "name_ru": "Три в ряд",
+      "coreLoop": "Swap two adjacent tiles to line up 3 or more of a colour; matches clear, tiles fall and cascade.",
+      "controls": "Swipe a tile toward a neighbour, or tap one tile then a neighbour.",
+      "progression": [
+        "Columns = floor(0.96 W / min tap target), clamped to 5..8; Bejeweled uses 8x8, Candy Crush at most 9x9 [S:bejeweled][S:king-patent]",
+        "Colours: 5 by default; 6 for teens; 4 for kids/seniors. One colour more or less can flip a level from nearly impossible to medium (King) [S:king-gdc]",
+        "Timed round 60 s like Bejeweled Blitz, or a move limit of 20-25 moves [S:bejeweled][H]",
+        "Score: 3-match 30, 4-match 60, 5-match 100, cascade multiplier x1, x2, x3... [H]",
+        "Speed bonus: 3 matches within 3 s gives a bonus, as in Blitz [S:bejeweled]",
+        "Difficulty levers if you need them: objectives, moves, star thresholds, number of colours, blockers (King GDC 2016) [S:king-gdc]"
+      ],
+      "objectKinds": [
+        "normal tile (one of 4-6 colours)",
+        "line blaster: 4 in a line, clears a row or column [S:king-patent]",
+        "bomb: L or T of 5, clears a 3x3 area [S:king-patent][S:bejeweled]",
+        "colour bomb: 5 in a line, swap to clear every tile of that colour [S:king-patent]"
+      ],
+      "powerUps": [
+        "+5 seconds tile in timed mode (Candy Crush timed levels) [S:king-patent]",
+        "Shuffle button: one free reshuffle [S:bejeweled]",
+        "Last Hurrah: when time is up, all special tiles on the board fire for bonus points [S:bejeweled]"
+      ],
+      "juice": [
+        "Swap tween 150 ms; an invalid swap swings back with a small shake of both tiles",
+        "Matched tiles grow to 1.2 then pop with GG.fx.burst in their colour",
+        "Falling tiles land with GG.fx.squash, staggered by 30 ms per column",
+        "Cascade: each step raises the pitch and shows 'x2', 'x3' floats",
+        "Special tile creation: white flash on the tile + GG.sfx('powerup')",
+        "Colour bomb: beams from the bomb to every tile of that colour, then GG.fx.shake('medium')",
+        "Hint: after 5 s idle the hint tiles wiggle (King: hint after a few seconds) [S:king-patent][H]"
+      ],
+      "failStates": ["Timer or moves run out below the target score"],
+      "winCondition": "Reach the target score (or clear N tiles of a colour) before time or moves run out.",
+      "audienceTweaks": {
+        "kids": "4 colours, 5 columns, no timer (moves only), every match plays a cheerful sound.",
+        "teens": "6 colours, Blitz-style 60 s with speed bonus and multipliers.",
+        "adults": "5 colours, 60 s or 25 moves.",
+        "seniors": "4 colours, 5 columns with visible gaps, tap-tap swap, no timer, hint after 4 s."
+      },
+      "commonPitfalls": [
+        "Starting board already contains matches, or there is no valid move; after every cascade check for a move and reshuffle without creating matches (King patent) [S:king-patent]",
+        "Silent rule bugs: L/T shapes counted twice, cascades not re-checked, specials not triggering; puzzle games had the lowest intent alignment in the OpenGame benchmark [S:opengame]",
+        "Input accepted during falling animations, so two swaps overlap and the grid desyncs; lock input until the board settles [H]",
+        "Cells smaller than the profile's tap target because an 8x8 board was hard-coded [S:king-patent]"
+      ],
+      "references": ["Bejeweled / Bejeweled Blitz (PopCap)", "Candy Crush Saga (King, 2012)"]
+    },
+    {
+      "id": "memory",
+      "genre": "puzzle",
+      "name_ru": "Мемори (найди пару)",
+      "coreLoop": "Flip two cards at a time to find matching pairs; remember where each picture was.",
+      "controls": "Tap a card to flip it. Input is locked while a mismatched pair is shown.",
+      "progression": [
+        "Pairs: 6 (3x4) for kids and seniors, 8 (4x4) for adults, 10 (4x5) for teens [S:cowan][H]",
+        "Working memory holds about 4 chunks in adults (Cowan); children's visual capacity doubles between 5 and 10; older adults are weaker at binding item to location [S:cowan][S:riggs][S:cowan2006]",
+        "Mismatched pair stays visible 1.0 s before flipping back [H]",
+        "Optional preview: all cards visible for 2 s at the start [H]",
+        "Multi-level round: 3 boards of growing size (e.g. 4, 6, 8 pairs) in 120 s [H]"
+      ],
+      "objectKinds": ["face-down card", "face-up card", "matched card (stays open, dimmed)", "bonus card: reveals all cards for 1.5 s"],
+      "powerUps": [
+        "Peek: all cards flip open for 1.5 s, once per board [H]",
+        "Extra time: +10 s [H]"
+      ],
+      "juice": [
+        "Flip: scaleX tween 1 to 0 to 1 over 200 ms, swapping the face at 0 + GG.sfx('tap')",
+        "Match: both cards jump (GG.fx.pop) and spark (GG.fx.burst) + GG.sfx('coin')",
+        "Mismatch: both cards shake horizontally 6 px for 200 ms + soft low tone",
+        "Streak of matches: 'x2' float and brighter sparkles",
+        "Board cleared: cards spin away one by one, GG.fx.banner",
+        "Cards deal in from the deck with a 40 ms stagger at the start"
+      ],
+      "failStates": ["Timer ends", "mistake limit reached (optional)"],
+      "winCondition": "Find all pairs within the round (or all boards).",
+      "audienceTweaks": {
+        "kids": "6 pairs, big friendly pictures, no timer, 2 s preview.",
+        "teens": "10 pairs, timer and 'perfect memory' bonus for no mistakes.",
+        "adults": "8 pairs, 60 s.",
+        "seniors": "6 pairs, high-contrast distinct pictures (not similar shades), no timer, mismatch visible 1.5 s."
+      },
+      "commonPitfalls": [
+        "Odd number of cards or a picture used 3 times, so the board can never be cleared [S:opengame]",
+        "Tapping the same card twice counts as a match [H]",
+        "Third card can be flipped while two are open (no input lock) [H]",
+        "Pictures that differ only by colour, unreadable for colour-blind players (Apple HIG: don't rely on colour alone) [H]"
+      ],
+      "references": ["Concentration (card game)", "Memory (Ravensburger, 1959)"]
+    },
+    {
+      "id": "quiz",
+      "genre": "quiz",
+      "name_ru": "Викторина",
+      "coreLoop": "Answer a short series of questions against a per-question timer; faster correct answers score more.",
+      "controls": "Tap one of 3-4 big answer buttons.",
+      "progression": [
+        "7-12 questions per round (QuizUp 7, HQ Trivia 12) [S:quizup][S:hq]",
+        "10 s per question (QuizUp, HQ Trivia); 20 s for seniors and kids [S:quizup][S:hq][H]",
+        "Points = round(1000 x (1 - (answerTime / timer) / 2)), so a correct answer scores 500-1000 (Kahoot formula) [S:kahoot]",
+        "Last question worth double (QuizUp) [S:quizup]",
+        "Questions ordered easy to hard (HQ, Millionaire) [S:hq][S:millionaire]"
+      ],
+      "objectKinds": ["question card", "answer button", "timer bar", "streak meter"],
+      "powerUps": [
+        "50/50: removes two wrong answers, once per round (Millionaire) [S:millionaire]",
+        "Extra life: one wrong answer forgiven (HQ Trivia extra lives) [S:hq]",
+        "Freeze timer for one question [H]"
+      ],
+      "juice": [
+        "Question slides in with Back.Out; answers drop in staggered by 60 ms",
+        "Timer bar shrinks and turns from green to red in the last 3 s, with a soft tick",
+        "Correct: button turns green, GG.fx.burst + GG.sfx('coin') + score counts up",
+        "Wrong: button shakes, turns red, the correct one pulses green for 1 s",
+        "Streak of 3: GG.fx.banner('Серия x3!')",
+        "Final screen: correct answers revealed one by one"
+      ],
+      "failStates": ["Too many wrong answers (e.g. 3)", "round ends below the pass score"],
+      "winCondition": "Answer at least N of M correctly (e.g. 7 of 10).",
+      "audienceTweaks": {
+        "kids": "Picture questions with 2-3 options, 20 s or no timer, no penalty for wrong answers.",
+        "teens": "10 s timer, speed scoring, streak bonus.",
+        "adults": "10-15 s timer, 4 options.",
+        "seniors": "20 s or no timer (WCAG 2.2.1: time limits adjustable), 3 options, big buttons stacked vertically, plain wording."
+      },
+      "commonPitfalls": [
+        "Wrong or ambiguous facts generated by the model; keep questions to widely known facts and double-check the answer key in code [H]",
+        "Correct answer always in the same position; shuffle answers per question [H]",
+        "Long questions overflow buttons at the audience's font size; wrap text and limit to about 90 characters [H]",
+        "Timer keeps running during the feedback animation or after the last question [S:opengame]"
+      ],
+      "references": ["QuizUp (Plain Vanilla, 2013)", "HQ Trivia (2017)", "Who Wants to Be a Millionaire?"]
+    },
+    {
+      "id": "idle-clicker",
+      "genre": "clicker",
+      "name_ru": "Idle-кликер",
+      "coreLoop": "Tap the big object to earn coins, buy upgrades that earn automatically, watch the numbers grow toward a goal.",
+      "controls": "Tap the main object; tap upgrade buttons in a panel at the bottom.",
+      "progression": [
+        "Upgrade cost = base x 1.15^owned (Cookie Clicker); AdVenture Capitalist uses 1.07-1.15 [S:cookie][S:adcap]",
+        "Production grows linearly with count; x2 milestones at 25 and 50 owned (AdVenture Capitalist) [S:pecorella][S:adcap]",
+        "For a 60-120 s round, compress: first upgrade affordable after about 5 s of tapping, then a new purchase every 8-15 s (Cookie Clicker's first purchase comes after 5-10 s; low-confidence observation) [S:cookie-onboarding][H]",
+        "4-5 upgrade tiers, each about 8-10x the cost of the previous (Cookie Clicker 15, 100, 1100, 12000) [S:cookie]",
+        "Goal scaled so a player who buys sensibly reaches it at about 80% of the round [H]"
+      ],
+      "objectKinds": ["main tap object", "auto-producer tier (shown as little workers)", "tap-power upgrade", "golden bonus that drifts across (tap within 3 s)"],
+      "powerUps": [
+        "Golden bonus: x7 production for 10 s (Cookie Clicker 'Frenzy' style) [H]",
+        "Tap frenzy: each tap worth x5 for 5 s [H]"
+      ],
+      "juice": [
+        "Each tap: main object squashes (GG.fx.squash) and a '+N' float rises from the tap point",
+        "Coins arc from the object into the coin counter",
+        "Counter rolls up smoothly rather than jumping; large numbers formatted 1.2K, 3.4M",
+        "Affordable upgrade buttons glow and bob; buying one: GG.fx.pop + GG.sfx('powerup')",
+        "Each new tier adds a visible worker or building to the scene (permanence) [S:nijman]",
+        "Milestone x2: GG.fx.banner + coin burst"
+      ],
+      "failStates": ["Round timer ends before the goal"],
+      "winCondition": "Reach the coin goal (e.g. 1,000,000) before the timer ends.",
+      "audienceTweaks": {
+        "kids": "Only 3 tiers, big pictures instead of numbers, goal shown as a filling jar.",
+        "teens": "More tiers, golden bonus chase, 'per second' display.",
+        "adults": "Default.",
+        "seniors": "3 tiers, large buttons with price and effect in words, no drifting golden bonus (or it stays 6 s)."
+      },
+      "commonPitfalls": [
+        "Numbers overflow the screen (no K/M formatting) or exceed Number precision [H]",
+        "Goal unreachable in the round with any strategy; simulate the economy before choosing the goal [H]",
+        "Tapping becomes pointless after the first auto-producer; keep taps worth at least 20% of income [H]",
+        "Nothing changes on screen except numbers (static screen) [S:opengame]"
+      ],
+      "references": ["Cookie Clicker (Orteil, 2013)", "AdVenture Capitalist (Hyper Hippo / Kongregate, 2014)", "Clicker Heroes (Playsaurus, 2014)"]
+    },
+    {
+      "id": "slicer",
+      "genre": "arcade",
+      "name_ru": "Слайсер (рубим фрукты)",
+      "coreLoop": "Objects are tossed up from below; swipe through them to slice, but never slice a bomb.",
+      "controls": "Swipe (drag) across objects; every segment of the finger path cuts. No taps needed.",
+      "progression": [
+        "Arcade-style 60 s round (Zen mode is 90 s with no bombs) [S:fruitninja]",
+        "Tosses come in waves tuned for combos: 1-2 objects early, 3-6 later, interval 1.4 s / d(t) [S:fruitninja][S:cho][H]",
+        "Bombs about 1 in 6 objects, none in the first 8 s [S:fruitninja][H]",
+        "Objects rise to 55-75% of screen height and fall under gravity of about 1.4 H/s^2 [H]",
+        "Classic mode alternative: 3 dropped objects end the game, +1 life every 100 points [S:fruitninja]"
+      ],
+      "objectKinds": [
+        "fruit: +1, hit area larger than the sprite [S:fruitninja]",
+        "bomb: -10 points and combo reset in timed mode, hit area smaller than the sprite [S:fruitninja]",
+        "special fruit: several slices for extra points [H]",
+        "power-up fruit [S:fruitninja]"
+      ],
+      "powerUps": [
+        "Frenzy: fruit tossed from the sides nonstop, about 7 s [S:fruitninja]",
+        "Freeze: slow motion and the timer pauses, about 7 s [S:fruitninja]",
+        "Double points: about 7 s [S:fruitninja]"
+      ],
+      "juice": [
+        "Blade trail follows the finger: 10-15 fading segments, width tapering [S:juicy-breakout][H]",
+        "Sliced fruit splits into two halves along the swipe angle, halves fly apart and spin",
+        "Juice splat stays on the background for 3 s (permanence) [S:nijman]",
+        "Combo of 3+ in one swipe: big 'Комбо x4!' float + bonus points",
+        "Bomb sliced: 200 ms white flash, GG.fx.shake('heavy'), everything pauses briefly",
+        "Each slice: short GG.sfx('pop') with random pitch, GG.vibrate(10) for adults/teens"
+      ],
+      "failStates": ["Timer ends below the target score", "in classic mode: 3 objects dropped or a bomb sliced"],
+      "winCondition": "Reach the target score in 60 s.",
+      "audienceTweaks": {
+        "kids": "Zen-style: no bombs, slower toss (gravity x0.7), big fruit.",
+        "teens": "Bombs from second 5, combos and Frenzy more often.",
+        "adults": "Default Arcade.",
+        "seniors": "No bombs or very distinct bombs, toss gravity x0.6 so objects hang longer, 90 s round, a short tap also slices."
+      },
+      "commonPitfalls": [
+        "Only the current pointer position is tested, so fast swipes skip objects; test the line segment between the last two pointer positions [H]",
+        "A finger resting on the screen keeps slicing; require movement speed above a threshold [H]",
+        "Objects tossed off-screen sideways or too high, so they can't be reached [H]",
+        "Bomb hit area as big as fruit makes the game feel unfair (Halfbrick made bombs smaller) [S:fruitninja]"
+      ],
+      "references": ["Fruit Ninja (Halfbrick, 2010)", "Cut the Rope (ZeptoLab, 2010) for swipe-to-cut input"]
+    }
+  ]
+}

@@ -110,9 +110,11 @@ async function makeSpec(engine: GameEngine, system: string, user: string, signal
   if (engine === "phaser") {
     norm.background = typeof norm.background === "string" && norm.background.trim() ? norm.background.slice(0, 400) : "soft gradient sky";
     if (!MUSIC_MOODS.includes(norm.music as (typeof MUSIC_MOODS)[number])) norm.music = "happy";
+    norm.recipe = typeof norm.recipe === "string" ? norm.recipe.slice(0, 32) : "custom";
   } else {
     delete norm.background;
     delete norm.music;
+    delete norm.recipe;
   }
   const parsed = GameSpecSchema.safeParse(norm);
   if (!parsed.success) throw new Error(`Spec failed validation: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`);
