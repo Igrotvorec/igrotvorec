@@ -28,7 +28,7 @@ cp .env.example .env   # LLM_BASE_URL, LLM_API_KEY — любой OpenAI-сов�
 bun run dev            # сервер :8787 + Vite :5173
 ```
 
-Продакшен: `docker compose up -d --build` (приложение + Caddy; домен задаётся `SITE_ADDRESS`).
+Продакшен: `docker compose up -d --build` (приложение + Caddy, домен `DOMAIN` в `.env`). Пошагово: [docs/deploy.md](docs/deploy.md).
 
 ## Структура
 
