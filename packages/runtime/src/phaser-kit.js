@@ -149,7 +149,7 @@
     jump: function () { tone(300, 0.15, "square", 0.08, 700); },
     hit: function () { tone(180, 0.2, "sawtooth", 0.12, 60); noise(0.12, 0.08); },
     explode: function () { noise(0.4, 0.2); tone(120, 0.35, "sawtooth", 0.12, 40); },
-    shoot: function () { tone(900, 0.09, "square", 0.06, 300); },
+    shoot: function () { var f = 820 + Math.random() * 180; tone(f, 0.08, "square", 0.045, f / 3); },
     powerup: function () { tone(400, 0.25, "triangle", 0.12, 1200); },
     levelup: function () { [523, 659, 784, 1047, 1319].forEach(function (f, i) { tone(f, 0.12, "square", 0.07, null, audio && audio.currentTime + i * 0.07); }); },
     win: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.18, "triangle", 0.14, null, audio && audio.currentTime + i * 0.11); }); },
@@ -295,7 +295,7 @@
     stopMusic();
     (won ? SFX.win : SFX.lose)();
     vibrate(won ? [30, 40, 30] : 120);
-    if (won) fx.burst(W / 2, H * 0.45, null, 40);
+    if (won) fx.burst(W / 2, H * 0.45, null, 40, true);
     var sc = gameScene();
     // Финальные частицы и вспышка видны: сцена живёт ещё 800 мс, потом замирает под карточкой.
     setTimeout(function () {
@@ -436,16 +436,28 @@
     var hex = typeof c === "string" ? c : cfg.palette.accent;
     try { return window.Phaser.Display.Color.HexStringToColor(hex).color; } catch (e) { return 0xffffff; }
   }
+  /**
+   * Базовый масштаб объекта для pop и squash. Запоминается, пока на объекте нет эффекта,
+   * поэтому частые вызовы не раздувают объект, а намеренное изменение размера игрой учитывается.
+   */
+  function fxBase(obj) {
+    if (!obj.__ggTween || !obj.__ggTween.isPlaying()) obj.__ggBase = { x: obj.scaleX, y: obj.scaleY };
+    else obj.__ggTween.stop();
+    obj.setScale(obj.__ggBase.x, obj.__ggBase.y);
+    return obj.__ggBase;
+  }
+  var hitstopUntil = 0;
   var fx = {
-    /** Разлёт искр: попадание, сбор, взрыв. */
-    burst: function (x, y, color, count) {
+    /** Разлёт искр: попадание, сбор, взрыв (мировые координаты события). */
+    burst: function (x, y, color, count, screen) {
       var sc = sceneNow();
       if (!sc) return;
       var n = Math.min(count || 18, 60);
-      sc.add
+      var em = sc.add
         .particles(x, y, "spark", { speed: { min: 160, max: 520 }, scale: { start: 1.1, end: 0 }, lifespan: { min: 350, max: 650 }, tint: [tintOf(color), 0xffffff], blendMode: "ADD", emitting: false })
-        .setDepth(40)
-        .explode(n);
+        .setDepth(40);
+      if (screen) em.setScrollFactor(0);
+      em.explode(n);
     },
     /** Всплывающий текст «+10» над местом события. */
     float: function (x, y, text, color) {
@@ -457,15 +469,26 @@
         .setDepth(45);
       sc.tweens.add({ targets: t, y: y - 120, alpha: 0, scale: 1.25, duration: 750, ease: "Cubic.Out", onComplete: function () { t.destroy(); } });
     },
-    /** Попадание по объекту: короткая остановка (hitstop), искры, отлёт с вращением; объект удаляется. */
+    /**
+     * Попадание по объекту: остановка кадра на 60 мс (вся сцена, а не только физика), искры, отлёт
+     * с вращением; объект сразу становится неактивным (GG.alive(obj) === false) и удаляется после анимации.
+     */
     hit: function (obj, color) {
       var sc = sceneNow();
-      if (!sc || !obj || !obj.active) return;
+      if (!sc || !obj || !obj.active || obj.__ggDying) return;
+      obj.__ggDying = true;
       fx.burst(obj.x, obj.y, color, 16);
       if (obj.body) obj.body.enable = false;
-      sc.physics.world.pause();
-      sc.time.delayedCall(60, function () { if (sc.sys.isActive()) sc.physics.world.resume(); });
-      sc.tweens.add({ targets: obj, scale: (obj.scale || 1) * 1.35, angle: (obj.angle || 0) + window.Phaser.Math.Between(-200, 200), alpha: 0, y: obj.y - 60, duration: 320, ease: "Quad.Out", onComplete: function () { obj.destroy(); } });
+      if (obj.disableInteractive) obj.disableInteractive();
+      obj.setActive(false);
+      if (obj.__ggTween) obj.__ggTween.stop();
+      sc.tweens.add({ targets: obj, scaleX: obj.scaleX * 1.35, scaleY: obj.scaleY * 1.35, angle: (obj.angle || 0) + window.Phaser.Math.Between(-200, 200), alpha: 0, y: obj.y - 60, duration: 320, ease: "Quad.Out", onComplete: function () { obj.destroy(); } });
+      var now = Date.now();
+      if (now > hitstopUntil + 150 && state === "playing") {
+        hitstopUntil = now + 60;
+        sc.scene.pause();
+        setTimeout(function () { if (state === "playing" && sc.sys.isPaused()) sc.scene.resume(); }, 60);
+      }
     },
     /** Тряска камеры: light — касание, medium — урон, heavy — взрыв. */
     shake: function (level) {
@@ -482,43 +505,55 @@
       lastFlash = now;
       var c = window.Phaser.Display.Color.IntegerToColor(tintOf(color || "#ffffff"));
       if (!calmAudience) return sc.cameras.main.flash(140, c.red, c.green, c.blue);
-      var pulse = sc.add.rectangle(W / 2, H / 2, W, H, tintOf(color || "#ffffff"), 0.22).setDepth(47);
+      var pulse = sc.add.rectangle(W / 2, H / 2, W, H, tintOf(color || "#ffffff"), 0.22).setDepth(47).setScrollFactor(0);
       sc.tweens.add({ targets: pulse, alpha: 0, duration: 380, ease: "Quad.Out", onComplete: function () { pulse.destroy(); } });
     },
-    /** Баннер «Уровень 2!»: верхняя треть под HUD, не закрывает игровую зону, около секунды. */
+    /** Баннер «Уровень 2!»: в экранных координатах под HUD (y≈300), текст ужимается до ширины экрана, около секунды. */
     banner: function (text, color) {
       var sc = sceneNow();
       if (!sc) return;
-      var y = H * 0.2;
-      var bg = sc.add.rectangle(W / 2, y, W, 120, 0x000000, 0.45).setDepth(48);
+      var y = 300;
+      var bg = sc.add.rectangle(W / 2, y, W, 120, 0x000000, 0.45).setDepth(48).setScrollFactor(0);
       var t = sc.add
-        .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "64px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 10 })
+        .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "60px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 10 })
         .setOrigin(0.5)
-        .setDepth(49);
+        .setDepth(49)
+        .setScrollFactor(0);
+      var fit = Math.min(1, 660 / Math.max(1, t.width));
       bg.scaleY = 0;
-      t.setScale(0.4).setAlpha(0);
+      t.setScale(fit * 0.4).setAlpha(0);
       sc.tweens.add({ targets: bg, scaleY: 1, duration: 160, ease: "Quad.Out" });
-      sc.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 260, ease: "Back.Out" });
+      sc.tweens.add({ targets: t, scale: fit, alpha: 1, duration: 260, ease: "Back.Out" });
       sc.tweens.add({ targets: [t, bg], alpha: 0, delay: 800, duration: 220, onComplete: function () { t.destroy(); bg.destroy(); } });
       SFX.levelup();
     },
-    /** Появление объекта: вырастает из нуля до своего размера. */
+    /** Появление объекта: вырастает из нуля до своего размера (вызывать после setDisplaySize). */
     pop: function (obj) {
       var sc = sceneNow();
       if (!sc || !obj) return obj;
-      var sx = obj.scaleX, sy = obj.scaleY;
+      var b = fxBase(obj);
       obj.setScale(0);
-      sc.tweens.add({ targets: obj, scaleX: sx, scaleY: sy, duration: 240, ease: "Back.Out" });
+      obj.__ggTween = sc.tweens.add({ targets: obj, scaleX: b.x, scaleY: b.y, duration: 240, ease: "Back.Out", onComplete: function () { obj.setScale(b.x, b.y); } });
       return obj;
     },
-    /** Сплющивание при приземлении или поимке (squash & stretch). */
+    /** Сплющивание при приземлении или поимке; повторные вызовы не накапливают масштаб. */
     squash: function (obj) {
       var sc = sceneNow();
-      if (!sc || !obj) return;
-      var sx = obj.scaleX, sy = obj.scaleY;
-      sc.tweens.add({ targets: obj, scaleX: sx * 1.25, scaleY: sy * 0.78, duration: 70, yoyo: true, ease: "Quad.Out", onComplete: function () { obj.setScale(sx, sy); } });
+      if (!sc || !obj || !obj.active) return;
+      var b = fxBase(obj);
+      obj.__ggTween = sc.tweens.add({ targets: obj, scaleX: b.x * 1.25, scaleY: b.y * 0.78, duration: 70, yoyo: true, ease: "Quad.Out", onComplete: function () { obj.setScale(b.x, b.y); } });
     },
   };
+
+  /** Честный хитбокс: круг по центру текстуры, k — доля меньшей стороны кадра (0.7 по умолчанию). */
+  function hitbox(obj, k) {
+    if (!obj || !obj.body) return obj;
+    var w = obj.width, h = obj.height;
+    var r = (Math.min(w, h) * (k || 0.7)) / 2;
+    obj.body.setCircle(r, w / 2 - r, h / 2 - r);
+    if (obj.body.isStatic && obj.refreshBody) obj.refreshBody();
+    return obj;
+  }
 
   // ---------- публичный API для кода игры ----------
   var GG = {
@@ -540,11 +575,14 @@
       if (name === "win" || name === "lose") return; // их играет рантайм в finish
       var f = SFX[name];
       var now = Date.now();
-      if (!f || now - (sfxLast[name] || 0) < (name === "shoot" ? 140 : 50)) return;
+      if (!f || now - (sfxLast[name] || 0) < (name === "shoot" ? 300 : 50)) return;
       sfxLast[name] = now;
       f();
     },
     fx: fx,
+    hitbox: hitbox,
+    /** Объект участвует в игре: существует и не гибнет после GG.fx.hit. */
+    alive: function (obj) { return !!(obj && obj.active && !obj.__ggDying); },
     vibrate: vibrate,
     storage: storage,
     hasImage: function (key) { return !!images[key]; },

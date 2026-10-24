@@ -31,7 +31,7 @@ Fields:
 - concept and coreMechanic: concrete enough for a programmer, including the goal count, what costs a life/time, what NEW thing appears at level 2 and 3, and the final wave/boss.
 - palette: four CSS hex colors matching the art; text must contrast with background.
 - sprites: 3-6 key objects that deserve illustrated art: the player, enemies/obstacles of each kind, the collectible, the power-up, the projectile if any. Not UI, not background, not tiny particles. key: short lowercase id; description: vivid visual description in English for an illustrator (object only, consistent art style, no background; projectiles: "vertical, pointing up"; enemy projectiles bright and glowing, clearly different from the player's); fallback: one similar emoji.
-- background: ONE full-screen portrait background scene in English for an illustrator that matches the theme (e.g. "sunny cartoon farm field with a wooden fence and distant hills"). No characters, no text, no UI; keep the middle area simple so gameplay objects stay readable.
+- background: ONE full-screen portrait background scene in English for an illustrator that matches the theme (e.g. "sunny cartoon farm field with a wooden fence and distant hills"). No characters, no text, no UI; keep the middle area simple so gameplay objects stay readable. If the game scrolls vertically (jumper, shooter, falling or flying), describe a background WITHOUT a horizon or ground: open sky with clouds, starry space, underwater, an abstract texture.
 - music: mood of the background loop: happy (bright, kids/casual), calm (seniors, puzzles), tense (action, shooters).
 - recipe: the proven genre recipe closest to the request; its progression, object kinds and power-ups guide the design (keep the user's theme and ideas). "custom" only if none fits at all.
 ${recipeMenu()}
@@ -63,9 +63,9 @@ GG.run(GameScene);
 Canvas: ${720}x${1280} logical pixels, portrait (GG.W, GG.H). Origin top-left. Arcade physics is on with zero gravity (set this.physics.world.gravity.y or body.setGravityY for platformers/jumps).
 
 Textures (already loaded, use by key; never load anything):
-- every sprite key from the spec: illustrated art fitted into a transparent 256x256 SQUARE. Size it with setDisplaySize(s, s) (equal sides, never stretch). The art does not fill the whole square, so for a fair hitbox use obj.body.setCircle(90, 38, 38) (texture units) or obj.body.setSize(170, 170);
+- every sprite key from the spec: illustrated art fitted into a transparent 256x256 SQUARE. Size it with setDisplaySize(s, s) (equal sides, never stretch). Then give physics objects a fair hitbox with GG.hitbox(obj, 0.7) (a centered circle, 0.7 of the size; 0.5-0.6 for the player, 0.8 for collectibles). NEVER compute body offsets or call setCircle/setSize with offsets yourself;
 - "bg": the 720x1280 background (always exists: illustrated art or a palette gradient). Static scenes: this.add.image(360, 640, 'bg'). Never scroll 'bg' itself;
-- "bgLoop": a seamless 720x2560 vertical loop of the background. For runners, jumpers and shooters: this.bgScroll = this.add.tileSprite(360, 640, 720, 1280, 'bgLoop'); then this.bgScroll.tilePositionY -= speed * delta / 1000 in update;
+- "bgLoop": a seamless 720x2560 vertical loop made of the background and its mirror copy. Scroll it only when the spec background has no horizon (sky, space, water, texture): this.bgScroll = this.add.tileSprite(360, 640, 720, 1280, 'bgLoop'); this.bgScroll.tilePositionY -= speed * delta / 1000. For landscapes keep 'bg' static and create motion with parallax decorations ('spark' stars or clouds) instead;
 - "spark": soft white radial dot for extra glows (tint it);
 - "px": white 8x8 square for rectangles, bars, platforms (setDisplaySize + setTint).
 
@@ -79,12 +79,13 @@ GG API:
 GG.fx — ready-made juice with tuned sizes and timings. Use these instead of hand-made particles, banners and flashes:
 - GG.fx.burst(x, y, color, count?) — spark explosion on hit, collect, death;
 - GG.fx.float(x, y, '+10', color?) — floating text that rises and fades;
-- GG.fx.hit(obj, color?) — hit a target: 60 ms hitstop, sparks, the object flies off spinning and is destroyed (do not destroy it yourself);
+- GG.fx.hit(obj, color?) — hit a target: 60 ms hitstop, sparks, the object flies off spinning and is destroyed (do not destroy it yourself). It becomes inactive immediately: skip it everywhere with GG.alive(obj) (taps, overlaps, counting, "missed" checks) so a tap on a dying object is never a miss;
 - GG.fx.shake('light' | 'medium' | 'heavy') — light on hit, medium on damage, heavy on explosion or boss;
 - GG.fx.flash(color?) — only for big moments (power-up, boss down); the runtime limits it;
-- GG.fx.banner('Уровень 2!') — level/wave banner in the upper third, plays its own sound;
-- GG.fx.pop(obj) — spawn animation (grows from 0 to its current scale); returns obj;
-- GG.fx.squash(obj) — squash & stretch on landing or catching.
+- GG.fx.banner('Уровень 2!') — level/wave banner just below the HUD (screen space, works with a moving camera), plays its own sound; keep the text short;
+- GG.fx.pop(obj) — spawn animation (grows from 0 to its current scale; call after setDisplaySize); returns obj;
+- GG.fx.squash(obj) — squash & stretch on landing or catching; safe to call often.
+- GG.hitbox(obj, k) and GG.alive(obj) — see above.
 
 Phaser 3.90 API that works (prefer these exact forms):
 - this.physics.add.image(x, y, key) / this.physics.add.sprite; .setVelocity(vx, vy), .setCollideWorldBounds(true), .setBounce(1), .setImmovable(true), .setDrag(), .body.setCircle(r), .body.setSize(w, h) (in unscaled texture pixels).
@@ -105,14 +106,17 @@ Balance and stakes (most important; a game nobody can lose is a failure):
 - No random-spam strategy: if tapping everywhere would work, add a cost for misses.
 - Levels switch on goal progress (1/3 and 2/3 of the goal), not on a clock; each level adds a NEW object or rule (new enemy type, moving obstacle, faster pattern) and shows GG.fx.banner. The last third is a final wave or a boss.
 - Power-ups at most once every ~15 s, lasting a few seconds, with a visible timer or glow on the player.
-- The round timer (if any) is ~1.3× of a clean run; when it ends without the goal, GG.lose(...).
+- The round timer (if any) is at most ~1.5× of a clean run; otherwise drop the timer. When it ends without the goal, GG.lose(...).
+- Difficulty curve: the first ~10 s are a warm-up that cannot be lost, the first mistake is forgiven (a warning, not a loss), pressure grows toward level 2. Target: a careless player loses in about half of the attempts, and not before the middle of the round; an attentive player wins.
+- Always passable: never permanently remove something the player needs to progress (a vanishing platform respawns, the next platform is always within jump height, there is always a way out). No soft locks where the player can only wait for the timer.
+- Threat before the finale: from level 2 enemies enter from beyond the screen edge, move and attack; danger is not saved for the boss only.
 
 Make it feel like a hit Flash game (all required):
 - Every spawn uses GG.fx.pop; every hit/collect uses GG.fx.hit or GG.fx.burst + GG.fx.float('+N'); damage uses GG.fx.shake('medium'); a combo or streak counter if it fits.
 - At least 2 kinds of objects plus a power-up, using the illustrated sprites.
 - The player reacts: idle bob or breathing tween, GG.fx.squash on landing/catching, a tilt toward the movement direction.
 - Enemy projectiles are bright and readable: at least 28px, with a tinted 'spark' glow, clearly different from the player's.
-- HUD drawn by you at the top (goal progress, lives or timer, level), readable, with stroke, fully opaque; keep the top-right 100x100 corner free (mute button there).
+- HUD drawn by you in the top band y 0-200 only (goal progress, lives or timer, level), readable, with stroke, fully opaque, setScrollFactor(0) if the camera moves; keep the top-right 100x100 corner free (mute button there). Spawn gameplay objects below y 220 or from beyond the screen edge, never under the HUD.
 
 Hard rules:
 - Initialize ALL round state inside create() (properties on this), never in the constructor or at top level: the scene restarts every round. Do not reset GG.score yourself (the runtime does).
