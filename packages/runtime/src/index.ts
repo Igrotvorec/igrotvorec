@@ -63,6 +63,7 @@ export interface PhaserKitConfig extends KitConfig {
 }
 
 const PHASER_CSS = `#gg-root{position:fixed;inset:0;z-index:1}#gg-root canvas{display:block}
+.gg-score{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:calc(20px*var(--gg-t)*var(--gg-k))}
 .gg-backdrop{position:fixed;inset:-40px;z-index:0;background:var(--gg-bg) center/cover no-repeat;filter:blur(28px) brightness(.75)}
 .gg-mute{position:fixed;z-index:15;top:calc(var(--gg-frame-y) + 8px*var(--gg-k));right:calc(var(--gg-frame-x) + 8px*var(--gg-k));width:calc(36px*var(--gg-k));height:calc(36px*var(--gg-k));border:0;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:calc(17px*var(--gg-k));line-height:1;cursor:pointer;touch-action:manipulation}`;
 

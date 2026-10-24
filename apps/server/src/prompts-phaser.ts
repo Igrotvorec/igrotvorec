@@ -127,6 +127,11 @@ Balance and stakes (most important; a game nobody can lose is a failure):
 - Difficulty curve: level 1 runs at GG.balance.spawnPerSec, pressure grows toward level 2 after the warm-up. Target: a careless player loses in about half of the attempts, and not before the middle of the round; an attentive player wins.
 - Always passable: never permanently remove something the player needs to progress (a vanishing platform respawns, the next platform is always within jump height, there is always a way out). No soft locks where the player can only wait for the timer.
 - Threat before the finale: from level 2 (and never during the warm-up) enemies enter from beyond the screen edge, move and attack; danger is not saved for the boss only.
+- Guaranteed end: with GG.balance.timeLimitSec 0, pressure also grows with time after the warm-up (spawn rate and danger ramp every ~10 s), not only with goal progress, so a passive player loses. (The runtime also ends a round whose goal does not move for 30 s.)
+- Threats must get to act: shooting enemies fire within ~0.8 s of entering or have armor, at least one shooting type from wave 2; auto-fire must not kill everything at the spawn edge.
+- Targets to tap or shoot: at level 1 at most ~1 spawn per second and at most 2 targets on screen; a target escaping at level 1 is a soft mistake (GG.damage(reason, { soft: true })), from level 2 a real one.
+- Catching games: the next object spawns sooner when the previous one is caught, so skill speeds up the round.
+- Hitboxes: GG.hitbox(obj, 0.6) for bullets, enemy projectiles and enemies.
 - Playfield: objects appear and can be hit, caught or tapped only below GG.top + 20; an object is targetable over its whole visible part, including the edge it enters from (a tap on a visible object is never a miss); player projectiles are destroyed when they reach GG.top; keep 40 px neutral margins at the left and right edges (nothing unreachable there).
 - Catching objects (basket, paddle, player that collects) get a generous hitbox: GG.hitbox(obj, 0.85), 0.9 for kids and seniors. Dangerous things use 0.6-0.7.
 

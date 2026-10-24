@@ -284,6 +284,14 @@
   var lives = 3;
   var forgiven = false;
   var softMistakes = 0;
+  var softAt = 0;
+  var goalMovedAt = 0;
+  /** Раунд без таймера не должен длиться вечно: если цель не двигается 30 с после разминки — поражение. */
+  setInterval(function () {
+    if (state !== "playing" || !goal || GG.inWarmup()) return;
+    var warm = ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000;
+    if (roundMs() - Math.max(goalMovedAt, warm) > 30000) finish(false, "Цель не сдвинулась 30 секунд");
+  }, 1000);
   var invulnerableUntil = 0;
   var goal = null;
   function roundMs() {
@@ -306,6 +314,8 @@
     lives = (cfg.balance && cfg.balance.lives) || 3;
     forgiven = false;
     softMistakes = 0;
+    softAt = 0;
+    goalMovedAt = 0;
     invulnerableUntil = 0;
     goal = null;
     recentHits = [];
@@ -374,6 +384,25 @@
       img.src = it[1];
     });
   }
+  /** Непрозрачная часть картинки в квадрате 256: хитбокс строится по ней, а не по пустым полям. */
+  var opaque = {};
+  function opaqueBounds(ctx) {
+    try {
+      var d = ctx.getImageData(0, 0, 256, 256).data;
+      var x0 = 256, y0 = 256, x1 = -1, y1 = -1;
+      for (var y = 0; y < 256; y += 2)
+        for (var x = 0; x < 256; x += 2)
+          if (d[(y * 256 + x) * 4 + 3] > 40) {
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+          }
+      return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 2, h: y1 - y0 + 2 };
+    } catch (e) {
+      return null;
+    }
+  }
   /** Каждый ключ спрайта существует как текстура: картинка ИИ или нарисованный emoji, если её нет. */
   function makeTextures(scene) {
     var tx = scene.textures;
@@ -387,6 +416,7 @@
       var dw = im.naturalWidth * k2, dh = im.naturalHeight * k2;
       sq.getContext().drawImage(im, (256 - dw) / 2, (256 - dh) / 2, dw, dh);
       sq.refresh();
+      opaque[key] = opaqueBounds(sq.getContext());
     }
     // Фон есть всегда: картинка ИИ или вертикальный градиент палитры.
     var bgSrc = images.bg;
@@ -475,9 +505,10 @@
   // ---------- готовые эффекты: размеры и частота заданы здесь, а не на глаз в коде модели ----------
   var calmAudience = false; // kids и seniors: без резких вспышек
   var lastFlash = 0;
+  /** Сцена для эффектов; на паузе hitstop тоже: объекты создаются сразу, твины пойдут после замирания. */
   function sceneNow() {
     var sc = gameScene();
-    return sc && sc.sys.isActive() ? sc : null;
+    return sc && (sc.sys.isActive() || hitstopActive) ? sc : null;
   }
   function tintOf(c) {
     if (typeof c === "number") return c;
@@ -600,7 +631,7 @@
       var sc = sceneNow();
       if (!sc) return;
       var y = TOP / 2;
-      var bg = sc.add.rectangle(W / 2, y, W, TOP, 0x000000, 0.72).setDepth(150).setScrollFactor(0);
+      var bg = sc.add.rectangle(W / 2, y, W, TOP, 0x111318, 0.97).setDepth(150).setScrollFactor(0);
       var t = sc.add
         .text(W / 2, y, String(text), { fontFamily: GG.font, fontSize: "60px", fontStyle: "bold", color: color || "#ffffff", stroke: "#000000", strokeThickness: 10 })
         .setOrigin(0.5)
@@ -628,7 +659,9 @@
       var sc = sceneNow();
       if (!sc || !obj || !obj.active) return;
       var b = fxBase(obj);
-      obj.__ggTween = sc.tweens.add({ targets: obj, scaleX: b.x * 1.25, scaleY: b.y * 0.78, duration: 70, yoyo: true, ease: "Quad.Out", onComplete: function () { obj.setScale(b.x, b.y); } });
+      // Тело физики растёт вместе с масштабом: у физических объектов сплющивание мягче, чтобы окно ловли не прыгало.
+      var sx = obj.body ? 1.08 : 1.25, sy = obj.body ? 0.93 : 0.78;
+      obj.__ggTween = sc.tweens.add({ targets: obj, scaleX: b.x * sx, scaleY: b.y * sy, duration: 70, yoyo: true, ease: "Quad.Out", onComplete: function () { obj.setScale(b.x, b.y); } });
     },
   };
 
@@ -639,7 +672,13 @@
   function hitbox(obj, k) {
     if (!obj || !obj.body) return obj;
     k = k || 0.7;
-    obj.body.setSize(obj.width * k, obj.height * k, true);
+    var b = obj.texture && opaque[obj.texture.key];
+    if (b && obj.width === 256 && obj.height === 256) {
+      // Прямоугольник по видимой части картинки, по центру неё; смещения в пикселях текстуры.
+      var w = b.w * k, h = b.h * k;
+      obj.body.setSize(w, h, false);
+      obj.body.setOffset(b.x + (b.w - w) / 2, b.y + (b.h - h) / 2);
+    } else obj.body.setSize(obj.width * k, obj.height * k, true);
     if (obj.body.isStatic && obj.refreshBody) obj.refreshBody();
     return obj;
   }
@@ -684,13 +723,15 @@
       if (state !== "playing") return "invulnerable";
       var now = Date.now();
       if (GG.inWarmup()) return "warmup";
-      // Мягкая ошибка (тап мимо, неточность): три мягких = одна настоящая.
+      if (now < invulnerableUntil) return "invulnerable";
+      // Мягкая ошибка (тап мимо, неточность): три мягких = одна настоящая; каждые 3 с одна забывается.
       if (opts && opts.soft) {
+        softMistakes = Math.max(0, softMistakes - Math.floor((now - softAt) / 3000));
+        softAt = now;
         softMistakes++;
         if (softMistakes < 3) return "soft";
         softMistakes = 0;
       }
-      if (now < invulnerableUntil) return "invulnerable";
       invulnerableUntil = now + 900;
       if (!forgiven) {
         forgiven = true;
@@ -711,12 +752,16 @@
     /** Идёт разминка: ошибки не считаются, опасности не появляются. */
     inWarmup: function () { return state === "playing" && roundMs() < ((cfg.balance && cfg.balance.warmupSec) || 8) * 1000; },
     /** Прогресс цели для HUD и финальной карточки: GG.setGoal(12, 24, 'Фрукты'). */
-    setGoal: function (done, total, label) { goal = { done: Math.max(0, done | 0), total: Math.max(1, total | 0), label: label ? String(label).slice(0, 24) : "" }; },
+    setGoal: function (done, total, label) {
+      var d = Math.max(0, done | 0);
+      if (!goal || d !== goal.done) goalMovedAt = roundMs();
+      goal = { done: d, total: Math.max(1, total | 0), label: label ? String(label).slice(0, 24) : "" };
+    },
     /** Был ли рядом недавний GG.fx.hit: тап по только что сбитому объекту не считается промахом. */
     recentlyHit: function (x, y, r, ms) {
       var now = Date.now();
       r = r || 120;
-      ms = ms || 400;
+      ms = ms || 500;
       for (var i = recentHits.length - 1; i >= 0; i--) {
         var h = recentHits[i];
         if (now - h.t > ms) break;
