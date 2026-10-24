@@ -231,6 +231,7 @@
       card.appendChild(el("p", "gg-sub", newRecord ? "Новый рекорд!" : "Рекорд: " + best));
     }
     var btn = el("button", "gg-btn", kind === "start" ? "Играть" : kind === "paused" ? "Продолжить" : "Ещё раз");
+    btn.style.color = readableOn(cfg.palette.primary);
     var shownAt = Date.now();
     btn.addEventListener("click", function () {
       // Защита от случайного тапа, которым игрок только что закончил раунд.
@@ -243,6 +244,14 @@
     card.appendChild(btn);
     overlay.appendChild(card);
     overlay.style.display = "flex";
+  }
+  /** Цвет текста кнопки по яркости её фона: палитра модели бывает «белое на белом». */
+  function readableOn(hex) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex || "");
+    if (!m) return "#111111";
+    var lin = function (v) { v = parseInt(v, 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    var l = 0.2126 * lin(m[1]) + 0.7152 * lin(m[2]) + 0.0722 * lin(m[3]);
+    return l > 0.45 ? "#111111" : "#ffffff";
   }
   function hideOverlay() {
     overlay.style.display = "none";
