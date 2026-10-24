@@ -453,15 +453,27 @@
     var bgc = tx.createCanvas("bg", W, H);
     bgc.getContext().drawImage(bgSrc, 0, 0, W, H);
     bgc.refresh();
-    // bgLoop: фон и его зеркальная копия по вертикали — бесшовная лента для прокрутки tileSprite.
+    // bgLoop: две копии фона подряд, шов скрыт плавным переходом низа картинки в её верх
+    // (зеркальная копия давала «два солнца» и перевёрнутые пейзажи).
     var loop = tx.createCanvas("bgLoop", W, H * 2);
     var lc = loop.getContext();
     lc.drawImage(bgSrc, 0, 0, W, H);
-    lc.save();
-    lc.translate(0, H * 2);
-    lc.scale(1, -1);
-    lc.drawImage(bgSrc, 0, 0, W, H);
-    lc.restore();
+    lc.drawImage(bgSrc, 0, H, W, H);
+    var SEAM = 220;
+    var strip = document.createElement("canvas");
+    strip.width = W;
+    strip.height = SEAM;
+    var stc = strip.getContext("2d");
+    // Нижняя полоса картинки продолжается за шов и растворяется в её верхней части.
+    stc.drawImage(bgSrc, 0, (bgSrc.height || H) * (1 - SEAM / H), bgSrc.width || W, (bgSrc.height || H) * (SEAM / H), 0, 0, W, SEAM);
+    stc.globalCompositeOperation = "destination-in";
+    var fade = stc.createLinearGradient(0, 0, 0, SEAM);
+    fade.addColorStop(0, "rgba(0,0,0,1)");
+    fade.addColorStop(1, "rgba(0,0,0,0)");
+    stc.fillStyle = fade;
+    stc.fillRect(0, 0, W, SEAM);
+    lc.drawImage(strip, 0, H);
+    lc.drawImage(strip, 0, 0);
     loop.refresh();
     for (var k in sprites) {
       if (tx.exists(k)) continue;
@@ -661,7 +673,9 @@
       t.setScale(fit * 0.4).setAlpha(0);
       sc.tweens.add({ targets: bg, scaleY: 1, duration: 160, ease: "Quad.Out" });
       sc.tweens.add({ targets: t, scale: fit, alpha: 1, duration: 260, ease: "Back.Out" });
-      sc.tweens.add({ targets: [t, bg], alpha: 0, delay: 800, duration: 220, onComplete: function () { t.destroy(); bg.destroy(); } });
+      // Сначала гаснет текст, потом фон: HUD под баннером не просвечивает сквозь полупрозрачный текст.
+      sc.tweens.add({ targets: t, alpha: 0, delay: 800, duration: 160, onComplete: function () { t.destroy(); } });
+      sc.tweens.add({ targets: bg, alpha: 0, delay: 960, duration: 160, onComplete: function () { bg.destroy(); } });
       SFX.levelup();
     },
     /** Появление объекта: вырастает из нуля до своего размера (вызывать после setDisplaySize). */
