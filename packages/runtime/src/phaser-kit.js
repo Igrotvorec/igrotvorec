@@ -884,8 +884,11 @@
   function tuneDifficulty() {
     var sc = gameScene();
     if (!sc || typeof sc.bot !== "function" || typeof game.headlessStep !== "function") return null;
-    var base = cfg.speed;
+    // Множители абсолютные, от неоткалиброванной скорости: подбор поверх уже откалиброванной версии
+    // иначе перемножил бы их.
+    var tunedSpeed = cfg.speed;
     var baseFactor = speedFactor;
+    var base = cfg.speed / (speedFactor || 1);
     var baseLives = (cfg.balance && cfg.balance.lives) || 3;
     var lives0 = baseLives;
     var baseTime = (cfg.balance && cfg.balance.timeLimitSec) || 0;
@@ -916,7 +919,7 @@
       for (var attempt = 0; attempt < 10; attempt++) {
         var f = ladder[idx];
         cfg.speed = base * f;
-        speedFactor = baseFactor * f;
+        speedFactor = f;
         if (cfg.balance) cfg.balance.lives = lives0;
         if (cfg.balance && timeLimit0) cfg.balance.timeLimitSec = timeLimit0;
         var lim = timeLimit0 ? timeLimit0 * 1000 + 2000 : limit;
@@ -1003,16 +1006,19 @@
         chosen = (easier.length ? easier : list)[0] || null;
       }
       // Подбор не справился: упёрлись в край и баланс всё ещё не в цели, наугад выигрывает или цель набирается в разминке.
+      // Потолок игры: на верхних испробованных ступенях доля побед небрежного не падает — скорость упёрлась в константы кода.
+      var easySteps = triedList.filter(function (t) { return t.tooEasy && t.lives === (chosen && chosen.lives); }).sort(function (a, b) { return b.factor - a.factor; });
+      var ceiling = easySteps.length >= 2 && easySteps[0].carelessWins >= easySteps[1].carelessWins - 1;
       var failedTune = !!chosen && (chosen.tooEasy || chosen.tooHard || chosen.randomWon || chosen.warmupLeak || chosen.stallBound);
       // При зацикливании множитель не подбирается: оставляем исходные числа и отмечаем провал.
       if (chosen && chosen.stallBound) chosen = { factor: 1, lives: baseLives, timeLimitSec: baseTime, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, stallBound: true };
-      return chosen ? { failed: failedTune, warmupLeak: !!chosen.warmupLeak, stall: !!chosen.stallBound, factor: chosen.factor, lives: chosen.lives, timeLimitSec: chosen.timeLimitSec, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
+      return chosen ? { failed: failedTune, warmupLeak: !!chosen.warmupLeak, stall: !!chosen.stallBound, ceiling: failedTune && ceiling, factor: chosen.factor, lives: chosen.lives, timeLimitSec: chosen.timeLimitSec, goodMs: chosen.goodMs, carelessWins: chosen.carelessWins, carelessMs: chosen.carelessMs, randomWon: chosen.randomWon, tried: Object.keys(tried).length, ms: Date.now() - started } : null;
     } catch (e) {
       reportError(e, "tune");
       return null;
     } finally {
       sim = false;
-      cfg.speed = base;
+      cfg.speed = tunedSpeed;
       speedFactor = baseFactor;
       if (cfg.balance) {
         cfg.balance.lives = baseLives;

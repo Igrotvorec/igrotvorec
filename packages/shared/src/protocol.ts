@@ -30,6 +30,8 @@ export interface TuneReport {
   warmupLeak: boolean;
   /** Небрежный проигрывает по правилу 30 с при живых жизнях: зацикливание в игре. */
   stall: boolean;
+  /** Скорость упёрлась в константы кода игры: доля побед на верхних ступенях не меняется. */
+  ceiling: boolean;
   /** Бот игры не годится для оценки (хороший не выигрывает): параметры не меняются. */
   skipped?: boolean;
   /** Множитель GG.speed, при котором баланс попал в цель. */
@@ -99,6 +101,7 @@ export function parseGameMessage(data: unknown, runId: string): GameToShell | nu
         ...(r.skipped === true ? { skipped: true } : {}),
         warmupLeak: r.warmupLeak === true,
         stall: r.stall === true,
+        ceiling: r.ceiling === true,
         factor,
         lives: Math.round(n(r.lives, 9) ?? 3) || 3,
         timeLimitSec: Math.round(n(r.timeLimitSec, 600) ?? 0),

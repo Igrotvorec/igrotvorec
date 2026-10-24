@@ -88,7 +88,7 @@ GG API:
 - GG.score (read/write), GG.addScore(n), GG.best.
 - GG.win(message) / GG.lose(message): call exactly once when the round ends; the runtime plays the win/lose sound, freezes the scene after a short moment and shows the result with the score. message is one short line WITHOUT the score (e.g. 'Все 25 фруктов в корзине!'). Stop spawning after that.
 - GG.sfx(name): tap, pop, coin, jump, hit, explode, shoot, powerup (do not play win/lose: the runtime does).
-- GG.vibrate(ms), GG.palette {background, primary, accent, text} (hex strings; convert with Phaser.Display.Color.HexStringToColor(hex).color for tints), GG.speed (multiply all speeds and spawn rates by it), GG.uiScale, GG.font (font family for every text).
+- GG.vibrate(ms), GG.palette {background, primary, accent, text} (hex strings; convert with Phaser.Display.Color.HexStringToColor(hex).color for tints), GG.speed (multiply all speeds and spawn rates by it; caps and limits scale with it too: min(MAX_SPEED * GG.speed, …), max(MIN_INTERVAL / GG.speed, …), never clamp with fixed constants), GG.uiScale, GG.font (font family for every text).
 - GG.storage.get(key) → Promise<string|null>, GG.storage.set(key, value) for small saves.
 
 GG.fx — ready-made juice with tuned sizes and timings. Use these instead of hand-made particles, banners and flashes:
