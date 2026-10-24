@@ -92,7 +92,7 @@ GG.fx — ready-made juice with tuned sizes and timings. Use these instead of ha
 - GG.fx.banner('Уровень 2!') — level/wave banner over the HUD band for about a second (screen space, works with a moving camera, never covers the playfield), plays its own sound; keep the text short;
 - GG.fx.pop(obj) — spawn animation (grows from 0 to its current scale; call after setDisplaySize); returns obj;
 - GG.fx.squash(obj) — squash & stretch on landing or catching; safe to call often.
-- GG.hitbox(obj, k) and GG.alive(obj) — see above.
+- GG.hitbox(obj, k, shape?) and GG.alive(obj) — see above; shape 'circle' for round things and projectiles.
 - GG.fx.miss(x, y, text?) — a miss or a missed object: grey-red puff and "мимо", clearly different from a catch.
 
 Balance API (the runtime owns these rules; do not reimplement them):
@@ -131,7 +131,7 @@ Balance and stakes (most important; a game nobody can lose is a failure):
 - Threats must get to act: shooting enemies fire within ~0.8 s of entering or have armor, at least one shooting type from wave 2; auto-fire must not kill everything at the spawn edge.
 - Targets to tap or shoot: at level 1 at most ~1 spawn per second and at most 2 targets on screen; a target escaping at level 1 is a soft mistake (GG.damage(reason, { soft: true })), from level 2 a real one.
 - Catching games: the next object spawns sooner when the previous one is caught, so skill speeds up the round.
-- Hitboxes: GG.hitbox(obj, 0.6) for bullets, enemy projectiles and enemies.
+- Hitboxes: GG.hitbox(obj, 0.6, 'circle') for bullets, enemy projectiles, balls and other round objects; GG.hitbox(obj, 0.6) for enemies.
 - Playfield: objects appear and can be hit, caught or tapped only below GG.top + 20; an object is targetable over its whole visible part, including the edge it enters from (a tap on a visible object is never a miss); player projectiles are destroyed when they reach GG.top; keep 40 px neutral margins at the left and right edges (nothing unreachable there).
 - Catching objects (basket, paddle, player that collects) get a generous hitbox: GG.hitbox(obj, 0.85), 0.9 for kids and seniors. Dangerous things use 0.6-0.7.
 

@@ -673,10 +673,19 @@
    * Честный хитбокс: прямоугольник по центру, k — доля размера кадра (0.7 по умолчанию).
    * setSize масштабируется вместе с объектом; радиус setCircle Phaser не масштабирует (ловля «магнитом»).
    */
-  function hitbox(obj, k) {
+  function hitbox(obj, k, shape) {
     if (!obj || !obj.body) return obj;
     k = k || 0.7;
     var b = obj.texture && opaque[obj.texture.key];
+    if (shape === "circle") {
+      // Круг для пуль и круглых объектов: квадрат засчитывает диагональные касания раньше времени.
+      // Радиус и центр в пикселях текстуры; коллизии Phaser берут halfWidth, он масштабируется сам.
+      var cx = b ? b.x + b.w / 2 : obj.width / 2, cy = b ? b.y + b.h / 2 : obj.height / 2;
+      var r = (Math.min(b ? b.w : obj.width, b ? b.h : obj.height) * k) / 2;
+      obj.body.setCircle(r, cx - r, cy - r);
+      if (obj.body.isStatic && obj.refreshBody) obj.refreshBody();
+      return obj;
+    }
     if (b && obj.width === 256 && obj.height === 256) {
       // Прямоугольник по видимой части картинки, по центру неё; смещения в пикселях текстуры.
       var w = b.w * k, h = b.h * k;
