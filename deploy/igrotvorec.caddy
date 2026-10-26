@@ -15,8 +15,8 @@ igrotvorec.games {
 	}
 
 	reverse_proxy 127.0.0.1:18787 {
-		# Домен за Cloudflare: настоящий адрес клиента для лимита генераций — в CF-Connecting-IP.
-		header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+		# Запись DNS без прокси Cloudflare: Caddy сам кладёт адрес клиента в X-Forwarded-For.
+		# Если включить прокси Cloudflare, добавить: header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
 		# SSE: отдаём события клиенту без буферизации.
 		flush_interval -1
 	}

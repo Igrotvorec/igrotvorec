@@ -41,7 +41,7 @@ git pull && docker compose up -d --build
 - Код и сборка: `deploy/deploy.sh` (rsync без данных и `.env`, затем `docker compose -f docker-compose.vps.yml up -d --build`). С `--data` ещё и заменяет данные на сервере демо-галереей из `data-demo`.
 - `.env` на сервере: `~/igrotvorec/.env`. После установки прокси вписать `LLM_API_KEY` и выполнить `docker compose -f docker-compose.vps.yml up -d` в `~/igrotvorec`.
 - Сайт: `deploy/igrotvorec.caddy` лежит в `~/caddy/etc/`. Подключить строкой `import /etc/caddy/igrotvorec.caddy` в `~/caddy/etc/Caddyfile` и перезагрузить: `docker exec caddy-caddy-1 caddy reload --config /etc/caddy/Caddyfile`.
-- Домен за Cloudflare: адрес клиента для лимита генераций Caddy берёт из `CF-Connecting-IP`. Чтобы Caddy получил сертификат, в Cloudflare нужен режим SSL «Full» и запись `www` для редиректа.
+- DNS в Cloudflare: `A igrotvorec.games → <IP сервера>` и `CNAME www → igrotvorec.games`, без прокси (серое облако). Тогда Caddy сам получает сертификат и передаёт приложению настоящий адрес клиента. При включённом прокси Cloudflare нужен режим SSL «Full» и строка с `CF-Connecting-IP` из комментария в `deploy/igrotvorec.caddy`.
 
 ## Резервная копия
 
