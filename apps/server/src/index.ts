@@ -300,5 +300,6 @@ app.get("*", async (c, next) => {
 });
 
 recoverThumbClaims();
-Bun.serve({ port: config.port, fetch: app.fetch, idleTimeout: 30 });
+// HOST=127.0.0.1 — на сервере с общим Caddy в режиме host-сети порт не должен торчать наружу.
+Bun.serve({ port: config.port, hostname: process.env.HOST ?? "0.0.0.0", fetch: app.fetch, idleTimeout: 30 });
 console.log(`server on :${config.port}`);

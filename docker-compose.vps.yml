@@ -1,0 +1,23 @@
+# Вариант для сервера, где уже работает общий Caddy (server.example): только приложение,
+# в host-сети и только на 127.0.0.1. Сайт подключается к общему Caddy файлом deploy/igrotvorec.caddy.
+# host-сеть даёт приложению доступ к прокси LLM на том же сервере по 127.0.0.1.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    network_mode: host
+    environment:
+      DATA_DIR: /data
+      HOST: 127.0.0.1
+      PORT: ${APP_PORT:-18787}
+      # Адрес клиента приходит от Caddy в X-Forwarded-For (Caddy берёт его из CF-Connecting-IP).
+      TRUST_PROXY: "1"
+    volumes:
+      - ${DATA_PATH:-./data}:/data
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

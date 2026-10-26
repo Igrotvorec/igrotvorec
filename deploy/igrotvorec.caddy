@@ -1,0 +1,27 @@
+# Сайт для общего Caddy на сервере (~/caddy/etc). Подключается строкой
+#   import /etc/caddy/igrotvorec.caddy
+# в ~/caddy/etc/Caddyfile, затем: docker compose -f ~/caddy/docker-compose.yaml exec caddy caddy reload --config /etc/caddy/Caddyfile
+igrotvorec.games {
+	# Эндпоинты генерации стримят SSE; не сжимаем их, чтобы события уходили сразу.
+	@compressible not path /api/*
+	encode @compressible zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	}
+
+	reverse_proxy 127.0.0.1:18787 {
+		# Домен за Cloudflare: настоящий адрес клиента для лимита генераций — в CF-Connecting-IP.
+		header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+		# SSE: отдаём события клиенту без буферизации.
+		flush_interval -1
+	}
+}
+
+www.igrotvorec.games {
+	redir https://igrotvorec.games{uri} permanent
+}

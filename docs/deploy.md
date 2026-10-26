@@ -34,6 +34,15 @@ git pull && docker compose up -d --build
 
 Игры, собранные прежним рантаймом, сервер пересобирает сам при первом открытии (метка версии рантайма в HTML), отдельный шаг не нужен.
 
+## Сервер server.example (общий Caddy)
+
+На сервере порты 80/443 уже держит общий Caddy (`~/caddy`, host-сеть), поэтому там поднимается только приложение: `docker-compose.vps.yml`, host-сеть, слушает `127.0.0.1:18787`. Прокси LLM ставится на этот же сервер, `LLM_BASE_URL=http://127.0.0.1:8317/v1`.
+
+- Код и сборка: `deploy/deploy.sh` (rsync без данных и `.env`, затем `docker compose -f docker-compose.vps.yml up -d --build`). С `--data` ещё и заменяет данные на сервере демо-галереей из `data-demo`.
+- `.env` на сервере: `~/igrotvorec/.env`. После установки прокси вписать `LLM_API_KEY` и выполнить `docker compose -f docker-compose.vps.yml up -d` в `~/igrotvorec`.
+- Сайт: `deploy/igrotvorec.caddy` лежит в `~/caddy/etc/`. Подключить строкой `import /etc/caddy/igrotvorec.caddy` в `~/caddy/etc/Caddyfile` и перезагрузить: `docker exec caddy-caddy-1 caddy reload --config /etc/caddy/Caddyfile`.
+- Домен за Cloudflare: адрес клиента для лимита генераций Caddy берёт из `CF-Connecting-IP`. Чтобы Caddy получил сертификат, в Cloudflare нужен режим SSL «Full» и запись `www` для редиректа.
+
 ## Резервная копия
 
 Всё состояние лежит в `./data` (или в `DATA_PATH`). Копировать с остановкой приложения или после `wal_checkpoint`, как в шаге 5.
