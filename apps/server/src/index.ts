@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { serveStatic } from "hono/bun";
@@ -290,13 +291,36 @@ app.get("/play/:gameId", (c) => {
   });
 });
 
+/**
+ * index.html веб-приложения с превью ссылки: og:image и og:url должны быть абсолютными, а домен
+ * известен только серверу (PUBLIC_URL), поэтому теги дописываются здесь, один раз при первом запросе.
+ */
+let indexHtml: string | null = null;
+async function spaHtml(): Promise<string | null> {
+  if (indexHtml !== null) return indexHtml;
+  const file = Bun.file(join(config.webDist, "index.html"));
+  if (!(await file.exists())) return null;
+  const base = config.publicUrl.replace(/\/$/, "");
+  const tags = [
+    `<meta property="og:url" content="${base}/" />`,
+    `<meta property="og:image" content="${base}/og.jpg" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+  ].join("\n    ");
+  indexHtml = (await file.text()).replace("</head>", `    ${tags}\n  </head>`);
+  return indexHtml;
+}
+const sendSpa = async (c: Context) => {
+  const html = await spaHtml();
+  return html === null ? c.notFound() : c.html(html);
+};
+app.get("/", sendSpa);
 app.use("/*", serveStatic({ root: config.webDist }));
-// SPA-fallback: root обязателен, иначе абсолютный путь склеивается с "./" и даёт 404.
-const spaIndex = serveStatic({ root: config.webDist, path: "index.html" });
-// Пути с расширением — это файлы: отсутствующий ассет должен давать 404, а не страницу.
-app.get("*", async (c, next) => {
+// SPA-fallback. Пути с расширением — это файлы: отсутствующий ассет должен давать 404, а не страницу.
+app.get("*", async (c) => {
   if (/\.[a-z0-9]+$/i.test(c.req.path)) return c.notFound();
-  return (await spaIndex(c, next)) ?? c.notFound();
+  return sendSpa(c);
 });
 
 recoverThumbClaims();
