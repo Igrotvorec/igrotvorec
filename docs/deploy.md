@@ -34,11 +34,11 @@ git pull && docker compose up -d --build
 
 Игры, собранные прежним рантаймом, сервер пересобирает сам при первом открытии (метка версии рантайма в HTML), отдельный шаг не нужен.
 
-## Сервер server.example (общий Caddy)
+## Сервер с общим Caddy
 
-На сервере порты 80/443 уже держит общий Caddy (`~/caddy`, host-сеть), поэтому там поднимается только приложение: `docker-compose.vps.yml`, host-сеть, слушает `127.0.0.1:18787`. Прокси LLM ставится на этот же сервер, `LLM_BASE_URL=http://127.0.0.1:8317/v1`.
+Если на сервере порты 80/443 уже держит общий Caddy (`~/caddy`, host-сеть), там поднимается только приложение: `docker-compose.vps.yml`, host-сеть, слушает `127.0.0.1:18787`. Прокси LLM ставится на этот же сервер, `LLM_BASE_URL=http://127.0.0.1:8317/v1`.
 
-- Код и сборка: `deploy/deploy.sh` (rsync без данных и `.env`, затем `docker compose -f docker-compose.vps.yml up -d --build`). С `--data` ещё и заменяет данные на сервере демо-галереей из `data-demo`.
+- Код и сборка: `SERVER=user@host deploy/deploy.sh` (rsync без данных и `.env`, затем `docker compose -f docker-compose.vps.yml up -d --build`). С `--data` ещё и заменяет данные на сервере демо-галереей из `data-demo`.
 - `.env` на сервере: `~/igrotvorec/.env`. После установки прокси вписать `LLM_API_KEY` и выполнить `docker compose -f docker-compose.vps.yml up -d` в `~/igrotvorec`.
 - Сайт: `deploy/igrotvorec.caddy` лежит в `~/caddy/etc/`. Подключить строкой `import /etc/caddy/igrotvorec.caddy` в `~/caddy/etc/Caddyfile` и перезагрузить: `docker exec caddy-caddy-1 caddy reload --config /etc/caddy/Caddyfile`.
 - DNS в Cloudflare: `A igrotvorec.games → <IP сервера>` и `CNAME www → igrotvorec.games`, без прокси (серое облако). Тогда Caddy сам получает сертификат и передаёт приложению настоящий адрес клиента. При включённом прокси Cloudflare нужен режим SSL «Full» и строка с `CF-Connecting-IP` из комментария в `deploy/igrotvorec.caddy`.

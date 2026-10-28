@@ -3,7 +3,7 @@
 #   deploy/deploy.sh           — только код
 #   deploy/deploy.sh --data    — ещё и демо-галерея из data-demo (заменит данные на сервере!)
 set -euo pipefail
-SERVER="${SERVER:-server.example}"
+SERVER="${SERVER:?укажите сервер: SERVER=user@host deploy/deploy.sh}"
 DIR="${DIR:-igrotvorec}"
 cd "$(dirname "$0")/.."
 
